@@ -1,0 +1,11 @@
+name: computer-vision-project
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python
+  - numpy
+  - pytorch
+  - pytorch-lightning
+  - opencv
+  - pillow
