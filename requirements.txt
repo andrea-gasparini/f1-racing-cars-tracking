@@ -2,3 +2,4 @@ numpy
 pytorch
 pytorch-lightning
 torchvision
+jupyter

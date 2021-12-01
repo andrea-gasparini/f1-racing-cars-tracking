@@ -40,9 +40,3 @@ class RacingF1Dataset(Dataset):
 
     def __getitem__(self, idx: int) -> Dict[str, Union[str, Optional[Dict[str, int]]]]:
         return self.samples[idx]
-
-
-if __name__ == '__main__':
-    a = RacingF1Dataset(["dataset/racing-1"])
-    for x in [a[0], a[1], a[200]]:
-        print(x)
