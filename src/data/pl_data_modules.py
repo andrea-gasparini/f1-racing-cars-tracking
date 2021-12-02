@@ -21,16 +21,15 @@ class RacingF1DataModule(pl.LightningDataModule):
         self.val_dirs = join_dirs(self.dataset_dir, val_subdirs)
         self.test_dirs = join_dirs(self.dataset_dir, test_subdirs)
 
-
     # def prepare_data(self, *args, **kwargs):
     # 	raise NotImplementedError
 
 
     def setup(self, stage: Optional[str] = None) -> None:
-        if stage == 'fit':
+        if stage == 'fit' or stage is None:
             self.train_dataset = RacingF1Dataset(self.train_dirs)
             self.val_dataset = RacingF1Dataset(self.val_dirs)
-        elif stage == 'test':
+        elif stage == 'test' or stage is None:
             self.test_set = RacingF1Dataset(self.test_dirs)
 
 
