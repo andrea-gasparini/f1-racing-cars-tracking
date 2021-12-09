@@ -1,5 +1,8 @@
 from torch.utils.data import Dataset
+from torch import Tensor
 from typing import List, Dict, Optional, Union
+from PIL import Image
+from torchvision import transforms
 
 import os
 
@@ -38,5 +41,12 @@ class RacingF1Dataset(Dataset):
         return len(self.samples)
 
 
-    def __getitem__(self, idx: int) -> Dict[str, Union[str, Optional[Dict[str, int]]]]:
-        return self.samples[idx]
+    def __getitem__(self, idx: int) -> Dict[str, Union[Tensor, Optional[Dict[str, int]]]]:
+        sample_img_path = self.samples[idx]['img_path']
+        img = Image.open(sample_img_path)
+        convert_tensor = transforms.ToTensor()
+
+        return {
+			'img': convert_tensor(img),
+			'bounding_box': self.samples[idx]['bounding_box']
+		}

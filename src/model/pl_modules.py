@@ -4,10 +4,7 @@ import torch
 
 from typing import Any, List
 from torch import Tensor
-from torch.nn.modules.dropout import Dropout
 from torch.nn import Module, Sequential, Linear, Dropout, ReLU, Sigmoid, MSELoss
-
-from src.utils import paths_images_to_tensor
 
 
 class RacingF1Detector(pl.LightningModule):
@@ -60,7 +57,7 @@ class RacingF1Detector(pl.LightningModule):
 
     def training_step(self, batch: dict, batch_idx: int) -> Tensor:
 
-        inputs = paths_images_to_tensor(batch['img_path'])
+        inputs = batch['img']
         labels = batch['bounding_box']
 
         logits = self.forward(inputs)
