@@ -1,10 +1,14 @@
 import pytorch_lightning as pl
-import torchvision.models as models
 import torch
 
 from typing import Any, List
 from torch import Tensor
-from torch.nn import Module, Sequential, Linear, Dropout, ReLU, Sigmoid, MSELoss
+from torch.nn.modules.activation import ReLU, Sigmoid
+from torch.nn.modules.container import Sequential
+from torch.nn.modules.conv import Conv2d
+from torch.nn.modules.flatten import Flatten
+from torch.nn.modules.linear import Linear
+from torch.nn.modules.loss import MSELoss
 
 
 class RacingF1Detector(pl.LightningModule):
@@ -15,30 +19,25 @@ class RacingF1Detector(pl.LightningModule):
         self.save_hyperparameters(hparams)
         self.loss_function = MSELoss()
 
-        vgg16 = models.vgg16(pretrained=True)
-        vgg16.training = False
-        
-        for param in vgg16.features.parameters():
-            param.requires_grad = False
-            
-        vgg_layers: List[Module] = list(vgg16.classifier.children())
-        vgg_last_linear_layer: Linear = vgg_layers[-1]
-        vgg_out_size: int = vgg_last_linear_layer.out_features
-
-        head_layers = Sequential(
-            *vgg_layers,
-            Dropout(0.5),
-            Linear(vgg_out_size, 128),
+        self.conv_layers = Sequential(                              # [batch_size, 3, 640, 360]
+            Conv2d(3, 64, self.hparams.kernel_size, 4, 1),          # [batch_size, 64, 160, 90]
             ReLU(),
-            Linear(128, 64),
+            Conv2d(64, 128, self.hparams.kernel_size, padding=1),   # [batch_size, 128, 160, 90]
             ReLU(),
-            Linear(64, 32),
-            ReLU(),
-            Linear(32, 4),
-            Sigmoid()
+            Conv2d(128, 256, self.hparams.kernel_size, padding=1),  # [batch_size, 256, 160, 90] 
+            Flatten()                                               # [batch_size, 256*160*90=3686400]
         )
 
-        self.model = torch.nn.Sequential(head_layers)
+        self.regression_layers = Sequential(
+            Linear(256 * 160 * 90, 128),                            # [batch_size, 128]
+            ReLU(),
+            Linear(128, 64),                                        # [batch_size, 64]
+            ReLU(),
+            Linear(64, 32),                                         # [batch_size, 32]
+            ReLU(),
+            Linear(32, 4),                                          # [batch_size, 4]
+            Sigmoid()
+        )
 
 
     def forward(self, x: List[Tensor], **kwargs) -> dict:
@@ -51,7 +50,8 @@ class RacingF1Detector(pl.LightningModule):
             output_dict: forward output containing the predictions (output logits ecc...) and the loss if any.
 
         """
-        out = self.model(x)
+        out = self.conv_layers(x)
+        out = self.regression_layers(out)
         return out
 
 
