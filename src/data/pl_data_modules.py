@@ -29,7 +29,8 @@ class RacingF1DataModule(pl.LightningDataModule):
         if stage == 'fit' or stage is None:
             self.train_dataset = RacingF1Dataset(self.train_dirs)
             self.val_dataset = RacingF1Dataset(self.val_dirs)
-        elif stage == 'test' or stage is None:
+        
+        if stage == 'test' or stage is None:
             self.test_set = RacingF1Dataset(self.test_dirs)
 
 
