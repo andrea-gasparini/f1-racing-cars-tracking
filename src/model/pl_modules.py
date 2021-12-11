@@ -66,6 +66,10 @@ class RacingF1Detector(pl.LightningModule):
         loss = self.loss_function(logits, labels)
         self.losses.append(loss)
         
+        avg_loss = torch.stack([i for i in self.losses]).mean()
+        # self.logger.experiment.add_scalar("Loss", avg_loss, self.current_epoch) # GOOGLE COLAB
+        
+        
         return loss
 
 
