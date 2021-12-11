@@ -18,6 +18,7 @@ class RacingF1Detector(pl.LightningModule):
 
         self.save_hyperparameters(hparams)
         self.loss_function = MSELoss()
+        self.losses = []
 
         self.conv_layers = Sequential(                              # [batch_size, 3, 640, 360]
             Conv2d(3, 64, self.hparams.kernel_size, 4, 1),          # [batch_size, 64, 160, 90]
@@ -61,12 +62,10 @@ class RacingF1Detector(pl.LightningModule):
         labels = batch['bounding_box']
 
         logits = self.forward(inputs)
-
-        loss = self.loss_function(logits[0], labels['x'])
-        loss += self.loss_function(logits[1], labels['y'])
-        loss += self.loss_function(logits[2], labels['width'])
-        loss += self.loss_function(logits[3], labels['height'])
-
+        labels = torch.IntTensor(torch.einsum('ij->ji', labels))
+        loss = self.loss_function(logits, labels)
+        self.losses.append(loss)
+        
         return loss
 
 
