@@ -12,7 +12,8 @@ class RacingF1DataModule(pl.LightningDataModule):
                        val_subdirs: List[str]   = ["racing-10", "racing-11"],
                        train_subdirs: List[str] = ["racing-1", "racing-7",
                                                    "racing-9", "racing-20"],
-                       test_subdirs: List[str]  = ["racing-12"]):
+                       test_subdirs: List[str]  = ["racing-12"],
+                       data_transform = None):
 
         super().__init__()
         self.batch_size = batch_size
@@ -20,6 +21,7 @@ class RacingF1DataModule(pl.LightningDataModule):
         self.train_dirs = join_dirs(self.dataset_dir, train_subdirs)
         self.val_dirs = join_dirs(self.dataset_dir, val_subdirs)
         self.test_dirs = join_dirs(self.dataset_dir, test_subdirs)
+        self.data_transform = data_transform
 
     # def prepare_data(self, *args, **kwargs):
     # 	raise NotImplementedError
@@ -27,11 +29,11 @@ class RacingF1DataModule(pl.LightningDataModule):
 
     def setup(self, stage: Optional[str] = None) -> None:
         if stage == 'fit' or stage is None:
-            self.train_dataset = RacingF1Dataset(self.train_dirs)
-            self.val_dataset = RacingF1Dataset(self.val_dirs)
+            self.train_dataset = RacingF1Dataset(self.train_dirs, self.data_transform)
+            self.val_dataset = RacingF1Dataset(self.val_dirs, self.data_transform)
         
         if stage == 'test' or stage is None:
-            self.test_set = RacingF1Dataset(self.test_dirs)
+            self.test_set = RacingF1Dataset(self.test_dirs, self.data_transform)
 
 
     def train_dataloader(self) -> DataLoader:
