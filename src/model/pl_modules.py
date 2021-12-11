@@ -59,8 +59,8 @@ class RacingF1Detector(pl.LightningModule):
     def training_step(self, batch: dict, batch_idx: int) -> Tensor:
 
         inputs = batch['img']
-        labels = batch['bounding_box']
-
+        labels = torch.Tensor([label.tolist() for label in batch['bounding_box']])
+        
         logits = self.forward(inputs)
         labels = torch.IntTensor(torch.einsum('ij->ji', labels))
         loss = self.loss_function(logits, labels)
