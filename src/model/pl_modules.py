@@ -1,5 +1,6 @@
 import pytorch_lightning as pl
 import torch
+import torchvision
 
 from typing import Any, List
 from torch import Tensor
@@ -63,7 +64,7 @@ class RacingF1Detector(pl.LightningModule):
 
 
     def training_epoch_end(self, outputs):
-        raise NotImplementedError
+      ...
 
 
     def validation_epoch_end(self, outputs):
