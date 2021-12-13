@@ -1,5 +1,6 @@
 import pytorch_lightning as pl
 import torch
+import torchvision
 
 from typing import Any, List
 from torch import Tensor
@@ -9,7 +10,8 @@ from torch.nn.modules.conv import Conv2d
 from torch.nn.modules.flatten import Flatten
 from torch.nn.modules.linear import Linear
 from torch.nn.modules.loss import MSELoss
-
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+import torchvision.models as models
 
 class RacingF1Detector(pl.LightningModule):
 
@@ -19,26 +21,11 @@ class RacingF1Detector(pl.LightningModule):
         self.save_hyperparameters(hparams)
         self.loss_function = MSELoss()
 
-        self.conv_layers = Sequential(                              # [batch_size, 3, 640, 360]
-            Conv2d(3, 64, self.hparams.kernel_size, 4, 1),          # [batch_size, 64, 160, 90]
-            ReLU(),
-            Conv2d(64, 128, self.hparams.kernel_size, padding=1),   # [batch_size, 128, 160, 90]
-            ReLU(),
-            Conv2d(128, 256, self.hparams.kernel_size, padding=1),  # [batch_size, 256, 160, 90] 
-            Flatten()                                               # [batch_size, 256*160*90=3686400]
-        )
-
-        self.regression_layers = Sequential(
-            Linear(256 * 160 * 90, 128),                            # [batch_size, 128]
-            ReLU(),
-            Linear(128, 64),                                        # [batch_size, 64]
-            ReLU(),
-            Linear(64, 32),                                         # [batch_size, 32]
-            ReLU(),
-            Linear(32, 4),                                          # [batch_size, 4]
-            Sigmoid()
-        )
-
+        backbone = models.resnet50(pretrained=True)
+        num_filters = backbone.fc.in_features
+        layers = list(backbone.children())[:-1]
+        self.feature_extractor = Sequential(*layers)
+        self.classifier = Linear(num_filters, 4)
 
     def forward(self, x: List[Tensor], **kwargs) -> dict:
         """
@@ -50,22 +37,22 @@ class RacingF1Detector(pl.LightningModule):
             output_dict: forward output containing the predictions (output logits ecc...) and the loss if any.
 
         """
-        out = self.conv_layers(x)
-        out = self.regression_layers(out)
-        return out
+        self.feature_extractor.eval()
+        with torch.no_grad():
+            representations = self.feature_extractor(x).flatten(1)
+        x = self.classifier(representations)
+        return x
 
 
     def training_step(self, batch: dict, batch_idx: int) -> Tensor:
 
         inputs = batch['img']
-        labels = torch.Tensor([label.tolist() for label in batch['bounding_box']])
-        
+        labels = torch.Tensor([label.tolist() for label in batch['bounding_box']]).cuda()
+        labels = torch.einsum('ij->ji', labels)
         logits = self.forward(inputs)
-        labels = torch.IntTensor(torch.einsum('ij->ji', labels))
         loss = self.loss_function(logits, labels)
         
         self.log("Train loss", loss, prog_bar=True, logger=True)
-        
         return loss
 
 
@@ -78,7 +65,7 @@ class RacingF1Detector(pl.LightningModule):
 
 
     def training_epoch_end(self, outputs):
-        raise NotImplementedError
+      ...
 
 
     def validation_epoch_end(self, outputs):
