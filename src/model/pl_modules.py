@@ -19,23 +19,23 @@ class RacingF1Detector(pl.LightningModule):
         self.save_hyperparameters(hparams)
         self.loss_function = MSELoss()
 
-        self.conv_layers = Sequential(                              # [batch_size, 3, 640, 360]
-            Conv2d(3, 64, self.hparams.kernel_size, 4, 1),          # [batch_size, 64, 160, 90]
+        self.conv_layers = Sequential(
+            Conv2d(3, 64, self.hparams.kernel_size, 4, 1, device=self.device),
             ReLU(),
-            Conv2d(64, 128, self.hparams.kernel_size, padding=1),   # [batch_size, 128, 160, 90]
+            Conv2d(64, 128, self.hparams.kernel_size, padding=1, device=self.device),
             ReLU(),
-            Conv2d(128, 256, self.hparams.kernel_size, padding=1),  # [batch_size, 256, 160, 90] 
-            Flatten()                                               # [batch_size, 256*160*90=3686400]
+            Conv2d(128, 256, self.hparams.kernel_size, padding=1, device=self.device),
+            Flatten()
         )
 
         self.regression_layers = Sequential(
-            Linear(256 * 160 * 90, 128),                            # [batch_size, 128]
+            Linear(256 * 160 * 90, 128, device=self.device),
             ReLU(),
-            Linear(128, 64),                                        # [batch_size, 64]
+            Linear(128, 64, device=self.device),
             ReLU(),
-            Linear(64, 32),                                         # [batch_size, 32]
+            Linear(64, 32, device=self.device),
             ReLU(),
-            Linear(32, 4),                                          # [batch_size, 4]
+            Linear(32, 4, device=self.device),
             Sigmoid()
         )
 
