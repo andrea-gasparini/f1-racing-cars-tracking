@@ -1,76 +1,80 @@
-from torch.utils.data import Dataset
+import pytorch_lightning as pl
+import torch
+import torchvision
+
+from typing import Any, List
 from torch import Tensor
-from typing import List, Dict, Optional, Union
-from PIL import Image, ImageDraw
-from torchvision import transforms
-import numpy as np
+from torch.nn.modules.activation import ReLU, Sigmoid
+from torch.nn.modules.container import Sequential
+from torch.nn.modules.conv import Conv2d
+from torch.nn.modules.flatten import Flatten
+from torch.nn.modules.linear import Linear
+from torch.nn.modules.loss import MSELoss
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+import torchvision.models as models
 
-import os
+class RacingF1Detector(pl.LightningModule):
 
-class RacingF1Dataset(Dataset):
+    def __init__(self, hparams = {}, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
 
-    IMG_SUBDIR = 'img'
-    GROUNDTRUTH_FILENAME = 'groundtruth.txt'
+        self.save_hyperparameters(hparams)
+        self.loss_function = MSELoss()
 
-    def __init__(self, dataset_dirs: List[str], transforms = None) -> None:
-        self.dataset_dirs: List[str] = dataset_dirs
-        self.samples: List[dict] = list()
-        self.transforms = transforms
+        backbone = models.resnet50(pretrained=True)
+        num_filters = backbone.fc.in_features
+        layers = list(backbone.children())[:-1]
+        self.feature_extractor = Sequential(*layers)
+        self.classifier = Linear(num_filters, 4)
 
-        for dir in self.dataset_dirs:			
-            groundtruth_dir: str = os.path.join(dir, self.GROUNDTRUTH_FILENAME)
-            imgs_dir: str = os.path.join(dir, self.IMG_SUBDIR)
-            imgs_dirs: List[str] = sorted(os.listdir(imgs_dir))
-            imgs_list = [{'img_path': os.path.join(imgs_dir, subdir)} for subdir in imgs_dirs]
+    def forward(self, x: List[Tensor], **kwargs) -> dict:
+        """
+        Method for the forward pass.
+        'training_step', 'validation_step' and 'test_step' should call
+        this method in order to compute the output predictions and the loss.
 
-            if os.path.isfile(groundtruth_dir):
-                with open(groundtruth_dir, mode='r') as f:
-                    groundtruth_list = f.readlines()
-                    
-                    for idx, value in enumerate(groundtruth_list):
-                        groundtruth_values = value.strip().split(',')
-                        if not self.transforms:
-                            imgs_list[idx]['bounding_box'] = [int(groundtruth_values[0]), int(groundtruth_values[1]), int(groundtruth_values[2]), int(groundtruth_values[3])]
-                        else:
-                            img = Image.open(imgs_list[idx]['img_path'])
-                            w, h = self.transforms[0].size
-                            b_box = [int(groundtruth_values[0]), int(groundtruth_values[1]), int(groundtruth_values[2]), int(groundtruth_values[3])]
-                            x_new = int(b_box[0]/(img.width/w))
-                            y_new = int(b_box[1]/(img.height/h))
-                            # Example of re-scaling [291, 63, 32, 13] -> [68, 25, ?, ?]
-                            # 1. 291 : 32 = 68 : x -> 32 * 68 / 291
-                            w_new = int(b_box[2] * x_new / b_box[0])
-                            h_new = int(b_box[3] * y_new / b_box[1])
-                            imgs_list[idx]['bounding_box'] = [x_new, y_new, w_new, h_new]
-            self.samples += imgs_list
+        Returns:
+            output_dict: forward output containing the predictions (output logits ecc...) and the loss if any.
+
+        """
+        self.feature_extractor.eval()
+        with torch.no_grad():
+            representations = self.feature_extractor(x).flatten(1)
+        x = self.classifier(representations)
+        return x
 
 
-    def __len__(self) -> int:
-        return len(self.samples)
+    def training_step(self, batch: dict, batch_idx: int) -> Tensor:
 
-
-    def __getitem__(self, idx: int) -> Dict[str, Union[Tensor, Optional[Dict[str, int]]]]:
-        sample_img_path = self.samples[idx]['img_path']
-        img = Image.open(sample_img_path)
-        convert_tensor = transforms.ToTensor()
+        inputs = batch['img']
+        labels = torch.Tensor([label.tolist() for label in batch['bounding_box']]).cuda()
+        labels = torch.einsum('ij->ji', labels)
+        logits = self.forward(inputs)
+        loss = self.loss_function(logits, labels)
         
-        if self.transforms:
-            # convention: first transform is the resize!
-            img = self.transforms(img)
+        self.log("Train loss", loss, prog_bar=True, logger=True)
+        return loss
 
-        return {
-			'img': convert_tensor(img),
-			'bounding_box': self.samples[idx]['bounding_box']
-		}
 
-    def show_image(self, idx: int) -> None:
-        image = Image.open(self.samples[idx]['img_path'])
-        if self.transforms:
-            image = self.transforms(image)
-        bounding_box = self.samples[idx]['bounding_box']
-        shape = [(bounding_box[0], bounding_box[1]), (bounding_box[0] + bounding_box[2], bounding_box[1] + bounding_box[3])]
-        image_copy = image.copy()
-        draw_bounding_box = ImageDraw.Draw(image_copy)
-        draw_bounding_box.rectangle(shape, outline='red')
-        image_copy.save('tesporaposdp.png')
-        return image, image_copy
+    def validation_step(self, batch: dict, batch_idx: int) -> None:
+        raise NotImplementedError
+
+
+    def test_step(self, batch: dict, batch_idx: int) -> Any:
+        raise NotImplementedError
+
+
+    def training_epoch_end(self, outputs):
+      ...
+
+
+    def validation_epoch_end(self, outputs):
+        raise NotImplementedError
+
+
+    def test_epoch_end(self, outputs):
+        raise NotImplementedError
+
+
+    def configure_optimizers(self):
+        return torch.optim.Adam(self.parameters())
