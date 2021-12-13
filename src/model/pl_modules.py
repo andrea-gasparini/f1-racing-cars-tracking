@@ -18,6 +18,7 @@ class RacingF1Detector(pl.LightningModule):
 
         self.save_hyperparameters(hparams)
         self.loss_function = MSELoss()
+        self.losses = []
 
         self.conv_layers = Sequential(
             Conv2d(3, 64, self.hparams.kernel_size, 4, 1, device=self.device),
@@ -58,15 +59,17 @@ class RacingF1Detector(pl.LightningModule):
     def training_step(self, batch: dict, batch_idx: int) -> Tensor:
 
         inputs = batch['img']
-        labels = batch['bounding_box']
-
+        labels = torch.Tensor([label.tolist() for label in batch['bounding_box']])
+        
         logits = self.forward(inputs)
-
-        loss = self.loss_function(logits[0], labels['x'])
-        loss += self.loss_function(logits[1], labels['y'])
-        loss += self.loss_function(logits[2], labels['width'])
-        loss += self.loss_function(logits[3], labels['height'])
-
+        labels = torch.IntTensor(torch.einsum('ij->ji', labels))
+        loss = self.loss_function(logits, labels)
+        self.losses.append(loss)
+        
+        avg_loss = torch.stack([i for i in self.losses]).mean()
+        # self.logger.experiment.add_scalar("Loss", avg_loss, self.current_epoch) # GOOGLE COLAB
+        
+        
         return loss
 
 
