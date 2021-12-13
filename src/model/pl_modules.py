@@ -1,7 +1,7 @@
 import pytorch_lightning as pl
 import torch
 
-from typing import Any
+from typing import Any, List
 from torch import Tensor
 from torch.nn.modules.activation import ReLU, Sigmoid
 from torch.nn.modules.container import Sequential
@@ -9,7 +9,7 @@ from torch.nn.modules.conv import Conv2d
 from torch.nn.modules.flatten import Flatten
 from torch.nn.modules.linear import Linear
 from torch.nn.modules.loss import MSELoss
-
+import torchvision.models as models
 
 class RacingF1Detector(pl.LightningModule):
 
@@ -18,30 +18,14 @@ class RacingF1Detector(pl.LightningModule):
 
         self.save_hyperparameters(hparams)
         self.loss_function = MSELoss()
-        self.losses = []
 
-        self.conv_layers = Sequential(
-            Conv2d(3, 64, self.hparams.kernel_size, 4, 1, device=self.device),
-            ReLU(),
-            Conv2d(64, 128, self.hparams.kernel_size, padding=1, device=self.device),
-            ReLU(),
-            Conv2d(128, 256, self.hparams.kernel_size, padding=1, device=self.device),
-            Flatten()
-        )
+        backbone = models.resnet50(pretrained=True)
+        num_filters = backbone.fc.in_features
+        layers = list(backbone.children())[:-1]
+        self.feature_extractor = Sequential(*layers)
+        self.classifier = Linear(num_filters, 4)
 
-        self.regression_layers = Sequential(
-            Linear(256 * 160 * 90, 128, device=self.device),
-            ReLU(),
-            Linear(128, 64, device=self.device),
-            ReLU(),
-            Linear(64, 32, device=self.device),
-            ReLU(),
-            Linear(32, 4, device=self.device),
-            Sigmoid()
-        )
-
-
-    def forward(self, x: Tensor, **kwargs) -> dict:
+    def forward(self, x: List[Tensor], **kwargs) -> dict:
         """
         Method for the forward pass.
         'training_step', 'validation_step' and 'test_step' should call
@@ -51,25 +35,22 @@ class RacingF1Detector(pl.LightningModule):
             output_dict: forward output containing the predictions (output logits ecc...) and the loss if any.
 
         """
-        out = self.conv_layers(x)
-        out = self.regression_layers(out)
-        return out
+        self.feature_extractor.eval()
+        with torch.no_grad():
+            representations = self.feature_extractor(x).flatten(1)
+        x = self.classifier(representations)
+        return x
 
 
     def training_step(self, batch: dict, batch_idx: int) -> Tensor:
 
         inputs = batch['img']
-        labels = torch.Tensor([label.tolist() for label in batch['bounding_box']])
-        
+        labels = torch.Tensor([label.tolist() for label in batch['bounding_box']]).cuda()
+        labels = torch.einsum('ij->ji', labels)
         logits = self.forward(inputs)
-        labels = torch.IntTensor(torch.einsum('ij->ji', labels))
         loss = self.loss_function(logits, labels)
-        self.losses.append(loss)
         
-        avg_loss = torch.stack([i for i in self.losses]).mean()
-        # self.logger.experiment.add_scalar("Loss", avg_loss, self.current_epoch) # GOOGLE COLAB
-        
-        
+        self.log("train_loss", loss, prog_bar=True, logger=True)
         return loss
 
 
