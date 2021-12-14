@@ -1,10 +1,9 @@
+from torch._C import default_generator, Generator
 from torch.nn.modules.container import Sequential
 from torch.utils.data import Dataset
-from torch import Tensor
 from typing import List, Dict, Optional, Union
 from PIL import Image
-from torchvision import transforms
-import numpy as np
+from src.utils import random_split_dataset
 
 import os
 
@@ -45,6 +44,12 @@ class RacingF1Dataset(Dataset):
                             h_new = int(b_box[3] * y_new / b_box[1])
                             imgs_list[idx]['bounding_box'] = [x_new, y_new, w_new, h_new]
             self.samples += imgs_list
+
+        
+    def random_split(self, train_size: float, test_size: float, val_size: Optional[float] = None,
+                     generator: Generator = default_generator) -> List['RacingF1Dataset']:
+
+        return random_split_dataset(self, train_size, test_size, val_size, generator)
 
 
     def __len__(self) -> int:
