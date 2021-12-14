@@ -1,7 +1,8 @@
+from torch.nn.modules.container import Sequential
 from torch.utils.data import Dataset
 from torch import Tensor
 from typing import List, Dict, Optional, Union
-from PIL import Image, ImageDraw
+from PIL import Image
 from torchvision import transforms
 import numpy as np
 
@@ -12,7 +13,8 @@ class RacingF1Dataset(Dataset):
     IMG_SUBDIR = 'img'
     GROUNDTRUTH_FILENAME = 'groundtruth.txt'
 
-    def __init__(self, dataset_dirs: List[str], transforms = None) -> None:
+    def __init__(self, dataset_dirs: List[str], transforms: Optional[Sequential] = None) -> None:
+
         self.dataset_dirs: List[str] = dataset_dirs
         self.samples: List[dict] = list()
         self.transforms = transforms
@@ -49,28 +51,16 @@ class RacingF1Dataset(Dataset):
         return len(self.samples)
 
 
-    def __getitem__(self, idx: int) -> Dict[str, Union[Tensor, Optional[Dict[str, int]]]]:
+    def __getitem__(self, idx: int) -> Dict[str, Union[Image.Image, str, Optional[List[int]]]]:
         sample_img_path = self.samples[idx]['img_path']
         img = Image.open(sample_img_path)
-        convert_tensor = transforms.ToTensor()
         
         if self.transforms:
             # convention: first transform is the resize!
             img = self.transforms(img)
 
         return {
-			'img': convert_tensor(img),
-			'bounding_box': self.samples[idx]['bounding_box']
-		}
-
-    def show_image(self, idx: int) -> None:
-        image = Image.open(self.samples[idx]['img_path'])
-        if self.transforms:
-            image = self.transforms(image)
-        bounding_box = self.samples[idx]['bounding_box']
-        shape = [(bounding_box[0], bounding_box[1]), (bounding_box[0] + bounding_box[2], bounding_box[1] + bounding_box[3])]
-        image_copy = image.copy()
-        draw_bounding_box = ImageDraw.Draw(image_copy)
-        draw_bounding_box.rectangle(shape, outline='red')
-        image_copy.save('tesporaposdp.png')
-        return image, image_copy
+            'img': img,
+            'img_path': self.samples[idx]['img_path'],
+            'bounding_box': self.samples[idx]['bounding_box']
+        }
