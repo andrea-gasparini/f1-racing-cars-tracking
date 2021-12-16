@@ -9,36 +9,23 @@ from torch.nn.modules.conv import Conv2d
 from torch.nn.modules.flatten import Flatten
 from torch.nn.modules.linear import Linear
 from torch.nn.modules.loss import MSELoss
-
+from torchvision import models
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 class RacingF1Detector(pl.LightningModule):
+
+    OUT_VALUES: int = 4
 
     def __init__(self, hparams = {}, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
         self.save_hyperparameters(hparams)
         self.loss_function = MSELoss()
-        self.losses = []
+        
+        self.model = models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
+        in_features = self.model.roi_heads.box_predictor.cls_score.in_features
+        self.model.roi_heads.box_predictor = FastRCNNPredictor(in_features, self.OUT_VALUES)
 
-        self.conv_layers = Sequential(
-            Conv2d(3, 64, self.hparams.kernel_size, 4, 1, device=self.device),
-            ReLU(),
-            Conv2d(64, 128, self.hparams.kernel_size, padding=1, device=self.device),
-            ReLU(),
-            Conv2d(128, 256, self.hparams.kernel_size, padding=1, device=self.device),
-            Flatten()
-        )
-
-        self.regression_layers = Sequential(
-            Linear(256 * 160 * 90, 128, device=self.device),
-            ReLU(),
-            Linear(128, 64, device=self.device),
-            ReLU(),
-            Linear(64, 32, device=self.device),
-            ReLU(),
-            Linear(32, 4, device=self.device),
-            Sigmoid()
-        )
 
 
     def forward(self, x: Tensor, **kwargs) -> dict:
@@ -59,16 +46,19 @@ class RacingF1Detector(pl.LightningModule):
     def training_step(self, batch: dict, batch_idx: int) -> Tensor:
 
         inputs = batch['img']
-        labels = torch.Tensor([label.tolist() for label in batch['bounding_box']])
-        
-        logits = self.forward(inputs)
-        labels = torch.IntTensor(torch.einsum('ij->ji', labels))
-        loss = self.loss_function(logits, labels)
-        self.losses.append(loss)
-        
-        avg_loss = torch.stack([i for i in self.losses]).mean()
-        # self.logger.experiment.add_scalar("Loss", avg_loss, self.current_epoch) # GOOGLE COLAB
-        
+        labels = torch.tensor([label.tolist() for label in batch['bounding_box']])
+        labels = torch.einsum('ij -> ji', labels)
+
+        target_labels = torch.tensor([0])
+
+        targets = list()
+        for label in labels:
+            target_box = [label[0], label[1] - label[3], label[0] + label[2], label[1]]
+            target_box = torch.tensor(target_box).reshape(1, self.OUT_VALUES)
+            targets.append({ 'boxes': target_box, 'labels': target_labels })
+
+        loss_dict = self.model(inputs, targets)
+        loss = sum(loss for loss in loss_dict.values())
         
         return loss
 
@@ -82,7 +72,7 @@ class RacingF1Detector(pl.LightningModule):
 
 
     def training_epoch_end(self, outputs):
-        raise NotImplementedError
+        pass
 
 
     def validation_epoch_end(self, outputs):
