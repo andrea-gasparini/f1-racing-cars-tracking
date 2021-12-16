@@ -1,7 +1,7 @@
 from typing import List, Optional, Union
 from torch.utils.data import DataLoader
-from torch.nn.modules.container import Sequential
 from src.data.datasets import RacingF1Dataset
+from torchvision.transforms import Compose
 from src.utils import join_dirs
 
 import pytorch_lightning as pl
@@ -13,7 +13,7 @@ class RacingF1DataModule(pl.LightningDataModule):
                        train_subdirs: List[str] = ["racing-1", "racing-7",
                                                    "racing-9", "racing-20"],
                        test_subdirs: List[str]  = ["racing-12"],
-                       data_transform: Optional[Sequential] = None):
+                       data_transform: Optional[Compose] = None):
 
         super().__init__()
         self.batch_size = batch_size
