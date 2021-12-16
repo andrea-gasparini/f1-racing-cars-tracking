@@ -3,7 +3,7 @@ from torch.nn.modules.container import Sequential
 from torch.utils.data import Dataset
 from typing import List, Dict, Optional, Union
 from PIL import Image
-from src.utils import random_split_dataset
+from src.utils import image_to_tensor, random_split_dataset
 
 import os
 
@@ -65,7 +65,7 @@ class RacingF1Dataset(Dataset):
             img = self.transforms(img)
 
         return {
-            'img': img,
+            'img': image_to_tensor(img),
             'img_path': self.samples[idx]['img_path'],
             'bounding_box': self.samples[idx]['bounding_box']
         }

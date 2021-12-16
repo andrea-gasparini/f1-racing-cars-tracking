@@ -2,13 +2,23 @@ import os
 
 from typing import List, Optional
 from torch._C import Generator, default_generator
+from torch.functional import Tensor
 from torch.utils.data.dataset import Dataset, Subset
 from torch.utils.data import random_split
 from PIL import Image, ImageDraw
+from torchvision import transforms
 
 
 def join_dirs(base_dir: str, subdirs: List[str]) -> List[str]:
     return [os.path.join(base_dir, subdir) for subdir in subdirs]
+
+
+def tensor_to_image(tensor: Tensor, rgb: bool = True) -> Image.Image:
+	return transforms.ToPILImage()(tensor).convert("RGB" if rgb else None)
+
+
+def image_to_tensor(image: Image.Image) -> Tensor:
+	return transforms.ToTensor()(image)
 
 
 def draw_bounding_box(img: Image.Image, bounding_box: List[int]) -> Image.Image:

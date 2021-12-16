@@ -9,7 +9,6 @@ from torch.nn.modules.conv import Conv2d
 from torch.nn.modules.flatten import Flatten
 from torch.nn.modules.linear import Linear
 from torch.nn.modules.loss import MSELoss
-from torchvision import transforms
 
 
 class RacingF1Detector(pl.LightningModule):
@@ -59,7 +58,7 @@ class RacingF1Detector(pl.LightningModule):
 
     def training_step(self, batch: dict, batch_idx: int) -> Tensor:
 
-        inputs = transforms.ToTensor()(batch['img'])
+        inputs = batch['img']
         labels = torch.Tensor([label.tolist() for label in batch['bounding_box']])
         
         logits = self.forward(inputs)
