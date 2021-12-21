@@ -9,7 +9,7 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 class RacingF1Detector(pl.LightningModule):
 
-    OUT_VALUES: int = 4
+    OUT_VALUES: int = 2
 
     def __init__(self, hparams = {}, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -46,7 +46,7 @@ class RacingF1Detector(pl.LightningModule):
             if target_box[0] == target_box[2] or target_box[1] == target_box[3]:
                 continue
             else:
-                target_box = torch.FloatTensor(target_box).reshape(1, self.OUT_VALUES).to(self.device)
+                target_box = torch.FloatTensor(target_box).reshape(1, 4).to(self.device)
                 targets.append({ 'boxes': target_box, 'labels': target_labels })
                 inputs = torch.cat([inputs[0:i], inputs[i+1:]])
 
