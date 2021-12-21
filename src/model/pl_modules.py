@@ -27,19 +27,10 @@ class RacingF1Detector(pl.LightningModule):
         self.model.roi_heads.box_predictor = FastRCNNPredictor(in_features, self.OUT_VALUES)
 
 
-
     def forward(self, x: Tensor, **kwargs) -> dict:
-        """
-        Method for the forward pass.
-        'training_step', 'validation_step' and 'test_step' should call
-        this method in order to compute the output predictions and the loss.
 
-        Returns:
-            output_dict: forward output containing the predictions (output logits ecc...) and the loss if any.
+        out = self.model(x)
 
-        """
-        out = self.conv_layers(x)
-        out = self.regression_layers(out)
         return out
 
 
@@ -48,18 +39,24 @@ class RacingF1Detector(pl.LightningModule):
         inputs = batch['img']
         labels = torch.tensor([label.tolist() for label in batch['bounding_box']])
         labels = torch.einsum('ij -> ji', labels)
-
-        target_labels = torch.tensor([0])
-
+ 
+        target_labels = torch.tensor([1])
+ 
         targets = list()
-        for label in labels:
+        for i, label in enumerate(labels):
             target_box = [label[0], label[1] - label[3], label[0] + label[2], label[1]]
-            target_box = torch.tensor(target_box).reshape(1, self.OUT_VALUES)
-            targets.append({ 'boxes': target_box, 'labels': target_labels })
-
+            if target_box[0] == target_box[2] or target_box[1] == target_box[3]:
+              continue
+            else:
+              target_box = torch.FloatTensor(target_box).reshape(1, self.OUT_VALUES)
+              targets.append({ 'boxes': target_box, 'labels': target_labels })
+              inputs = torch.cat([inputs[0:i], inputs[i+1:]])
+ 
+        
         loss_dict = self.model(inputs, targets)
         loss = sum(loss for loss in loss_dict.values())
-        
+        self.log("train_loss", loss, prog_bar=True, logger=True)
+
         return loss
 
 
