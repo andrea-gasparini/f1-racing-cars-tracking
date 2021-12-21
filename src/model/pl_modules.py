@@ -9,7 +9,11 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 class RacingF1Detector(pl.LightningModule):
 
-    OUT_VALUES: int = 2
+    NUM_CLASSES: int = 2
+    """
+    Number of classes for the FastRCNNPredictor,
+    at least 1 for the background and 1 for a type of object
+    """
 
     def __init__(self, hparams = {}, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -18,7 +22,7 @@ class RacingF1Detector(pl.LightningModule):
 
         self.model = models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
         in_features = self.model.roi_heads.box_predictor.cls_score.in_features
-        self.model.roi_heads.box_predictor = FastRCNNPredictor(in_features, self.OUT_VALUES)
+        self.model.roi_heads.box_predictor = FastRCNNPredictor(in_features, self.NUM_CLASSES)
 
         # metrics to track
         self.val_acc = torchmetrics.Accuracy()
@@ -46,7 +50,7 @@ class RacingF1Detector(pl.LightningModule):
             if target_box[0] == target_box[2] or target_box[1] == target_box[3]:
                 continue
             else:
-                target_box = torch.FloatTensor(target_box).reshape(1, 4).to(self.device)
+                target_box = torch.FloatTensor(target_box).unsqueeze(0).to(self.device)
                 targets.append({ 'boxes': target_box, 'labels': target_labels })
                 inputs = torch.cat([inputs[0:i], inputs[i+1:]])
 
@@ -63,10 +67,10 @@ class RacingF1Detector(pl.LightningModule):
             for out_sample in out_dict:
                 for key, value in out_sample.items():
 
-                    tensor_value = torch.tensor([value])
+                    unsq_value = value.unsqueeze(0)
 
-                    if key not in new_out_dict: new_out_dict[key] = tensor_value
-                    else: new_out_dict[key] = torch.cat((new_out_dict[key], tensor_value))
+                    if key not in new_out_dict: new_out_dict[key] = unsq_value
+                    else: new_out_dict[key] = torch.cat((new_out_dict[key], unsq_value))
 
             return new_out_dict
 
@@ -87,13 +91,12 @@ class RacingF1Detector(pl.LightningModule):
         out = self.step(batch)
 
         predictions = out['boxes']
-        labels = batch['labels']
+        labels = batch['bounding_box']
 
         accuracy = self.val_acc(predictions, labels)
         f1_score = self.val_f1(predictions, labels)
 
-        self.log_dict(
-            {
+        self.log_dict({
                 'val_acc': accuracy,
                 'val_f1': f1_score,
             },
@@ -108,13 +111,12 @@ class RacingF1Detector(pl.LightningModule):
         out = self.step(batch)
 
         predictions = out['boxes']
-        labels = batch['labels']
+        labels = batch['bounding_box']
 
         accuracy = self.test_acc(predictions, labels)
         f1_score = self.test_f1(predictions, labels)
 
-        self.log_dict(
-            {
+        self.log_dict({
                 'test_acc': accuracy,
                 'test_f1': f1_score,
             },
