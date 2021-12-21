@@ -1,8 +1,6 @@
-from typing import List, Tuple
+from typing import Dict, List, Tuple, Union
 from PIL import Image
 from torchvision.transforms import functional as TF
-import random
-import numpy as np
 
 class CustomRescale(object):
 
@@ -10,7 +8,7 @@ class CustomRescale(object):
         self.output_size = output_size
 
     
-    def __call__(self, sample: Tuple[Image.Image, List[int]]):
+    def __call__(self, sample: Tuple[Image.Image, List[int]]) -> Dict[str, Union[Image.Image, List[int]]]:
         image, bounding_box = sample[0], sample[1]
 
         h, w = image.size
@@ -34,4 +32,5 @@ class CustomRescale(object):
         # 1. 291 : 32 = 68 : x -> 32 * 68 / 291
         w_new = int(b_box[2] * x_new / b_box[0])
         h_new = int(b_box[3] * y_new / b_box[1])
-        return {"img": img, 'bounding_box': [x_new, y_new, w_new, h_new]}
+
+        return { 'img': img, 'bounding_box': [x_new, y_new, w_new, h_new] }

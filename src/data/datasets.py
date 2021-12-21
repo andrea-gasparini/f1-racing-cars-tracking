@@ -1,14 +1,11 @@
 from torch._C import default_generator, Generator
 from torch.utils.data import Dataset
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional
 from PIL import Image
 from src.utils import image_to_tensor, random_split_dataset
-from src.data.custom_transforms import CustomRescale
 from torchvision.transforms import Compose
 from torch import Tensor
 
-import torchvision.transforms.functional as TF
-import torchvision
 import torch
 import os
 
@@ -38,33 +35,34 @@ class RacingF1Dataset(Dataset):
 
         
     def random_split(self, train_size: float, test_size: float, val_size: Optional[float] = None,
-                     generator: Generator = default_generator) -> List['RacingF1Dataset']:
+                    generator: Generator = default_generator) -> List['RacingF1Dataset']:
 
         return random_split_dataset(self, train_size, test_size, val_size, generator)
 
     
-    def __preprocess_sample(self, idx: int) -> Dict[str, Union[Tensor, str, Optional[List[int]]]]:
-        sample_img_path = self.samples[idx]['img_path']
-        sample_bounding_box = self.samples[idx]['bounding_box']
-        img = Image.open(sample_img_path)
+    def __preprocess_sample(self, idx: int) -> Dict[str, Tensor]:
+        sample_bounding_box: List[int] = self.samples[idx]['bounding_box']
+        img: Image.Image = Image.open(self.samples[idx]['img_path'])
         
         if self.transforms:
             transformed_sample = self.transforms((img, sample_bounding_box))
             img = transformed_sample['img']
             sample_bounding_box = transformed_sample['bounding_box']
 
-        return { 'img': image_to_tensor(img), 'img_path': sample_img_path, 'bounding_box': sample_bounding_box }
+        return {
+            'img': image_to_tensor(img),
+            'bounding_box': torch.tensor(sample_bounding_box)
+        }
 
 
     def __len__(self) -> int:
         return len(self.samples)
 
 
-    def __getitem__(self, idx: int) -> Dict[str, Union[Tensor, str, Optional[List[int]]]]:
+    def __getitem__(self, idx: int) -> Dict[str, Tensor]:
         preprocessed_sample = self.__preprocess_sample(idx)
 
         return {
             'img': preprocessed_sample['img'],
-            'img_path': preprocessed_sample['img_path'],
             'bounding_box': preprocessed_sample['bounding_box']
         }
