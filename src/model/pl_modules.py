@@ -62,17 +62,23 @@ class RacingF1Detector(pl.LightningModule):
             return { 'loss': loss }
         else:
             # out_dict: List[Dict[str, Tensor]]
-            new_out_dict = dict()
+            new_out: Dict[str, Tensor] = dict()
 
             for out_sample in out_dict:
                 for key, value in out_sample.items():
 
                     unsq_value = value.unsqueeze(0)
 
-                    if key not in new_out_dict: new_out_dict[key] = unsq_value
-                    else: new_out_dict[key] = torch.cat((new_out_dict[key], unsq_value))
+                    if key not in new_out: new_out[key] = unsq_value
+                    else: new_out[key] = torch.cat((new_out[key], unsq_value))
 
-            return new_out_dict
+            boxes = new_out['boxes']
+            best_score_idxs = new_out['scores'].argmax(1)
+
+            predictions = [boxes[i].tolist() for boxes, i in zip(boxes, best_score_idxs)]
+            new_out['predictions'] = torch.tensor(predictions)
+
+            return new_out
 
 
     def training_step(self, batch: Dict[str, Tensor], batch_idx: int) -> Tensor:
@@ -90,7 +96,7 @@ class RacingF1Detector(pl.LightningModule):
 
         out = self.step(batch)
 
-        predictions = out['boxes']
+        predictions = out['predictions']
         labels = batch['bounding_box']
 
         accuracy = self.val_acc(predictions, labels)
@@ -110,7 +116,7 @@ class RacingF1Detector(pl.LightningModule):
 
         out = self.step(batch)
 
-        predictions = out['boxes']
+        predictions = out['predictions']
         labels = batch['bounding_box']
 
         accuracy = self.test_acc(predictions, labels)
