@@ -21,6 +21,11 @@ class RacingF1Detector(pl.LightningModule):
         self.save_hyperparameters(hparams)
 
         self.model = models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
+
+        # freeze the weights of the FastRCNN's layers
+        for param in self.model.parameters():
+            param.requires_grad = False
+
         in_features = self.model.roi_heads.box_predictor.cls_score.in_features
         self.model.roi_heads.box_predictor = FastRCNNPredictor(in_features, self.NUM_CLASSES)
 
@@ -146,4 +151,7 @@ class RacingF1Detector(pl.LightningModule):
 
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters())
+
+        params = [p for p in self.model.parameters() if p.requires_grad]
+
+        return torch.optim.Adam(params)
