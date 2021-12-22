@@ -52,13 +52,17 @@ class RacingF1Detector(pl.LightningModule):
 
         targets = list()
         for i, label in enumerate(labels):
-            target_box = [label[0], label[1] - label[3], label[0] + label[2], label[1]]
-            if target_box[0] == target_box[2] or target_box[1] == target_box[3]:
+
+            bbox = [label[0], label[1] - label[3], label[0] + label[2], label[1]]
+            bbox_is_invalid = bbox[0] == bbox[2] or bbox[1] == bbox[3]
+            
+            if bbox_is_invalid:
+                # remove sample from inputs tensor
+                inputs = torch.cat([inputs[0:i], inputs[i+1:]])
                 continue
             else:
-                target_box = torch.FloatTensor(target_box).unsqueeze(0).to(self.device)
-                targets.append({ 'boxes': target_box, 'labels': target_labels })
-                inputs = torch.cat([inputs[0:i], inputs[i+1:]])
+                bbox = torch.FloatTensor(bbox).unsqueeze(0).to(self.device)
+                targets.append({ 'boxes': bbox, 'labels': target_labels })
 
         out_dict = self.forward(inputs, targets)
 
