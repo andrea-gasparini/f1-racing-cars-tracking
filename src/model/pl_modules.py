@@ -2,7 +2,7 @@ import pytorch_lightning as pl
 import torch
 import torchmetrics
 
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 from torch import Tensor
 from torchvision import models
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
@@ -31,9 +31,10 @@ class RacingF1Detector(pl.LightningModule):
         self.test_f1 = torchmetrics.F1()
 
 
-    def forward(self, x: Tensor, **kwargs) -> Tensor:
+    def forward(self, x: Tensor, y: Optional[Tensor] = None,
+                **kwargs) -> Union[Dict[str, Tensor], List[Dict[str, Tensor]]]:
 
-        out = self.model(x)
+        out = self.model(x, y)
 
         return out
 
@@ -54,7 +55,7 @@ class RacingF1Detector(pl.LightningModule):
                 targets.append({ 'boxes': target_box, 'labels': target_labels })
                 inputs = torch.cat([inputs[0:i], inputs[i+1:]])
 
-        out_dict: Union[Dict[str, Tensor], List[Dict[str, Tensor]]] = self.model(inputs, targets)
+        out_dict = self.forward(inputs, targets)
 
         if self.training:
             # out_dict: Dict[str, Tensor]
