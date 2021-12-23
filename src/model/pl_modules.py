@@ -21,29 +21,20 @@ class RacingF1Detector(pl.LightningModule):
         self.save_hyperparameters(hparams)
 
         self.model = models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
-
-        # freeze the weights of the FastRCNN's layers
-        for param in self.model.parameters():
-            param.requires_grad = False
-
         in_features = self.model.roi_heads.box_predictor.cls_score.in_features
         self.model.roi_heads.box_predictor = FastRCNNPredictor(in_features, self.NUM_CLASSES)
 
         # metrics to track
-        self.val_acc = torchmetrics.Accuracy()
-        self.test_acc = torchmetrics.Accuracy()
-        self.val_f1 = torchmetrics.F1()        
-        self.test_f1 = torchmetrics.F1()
+        self.test_mAP = torchmetrics.MAP() # https://torchmetrics.readthedocs.io/en/latest/references/modules.html#map
+        
 
 
     def forward(self, x: Tensor, y: Optional[Tensor] = None,
                 **kwargs) -> Union[Dict[str, Tensor], List[Dict[str, Tensor]]]:
-
         out = self.model(x, y)
-
         return out
 
-    def step(self, batch: Dict[str, Tensor]) -> Dict[str, Tensor]:
+    def step(self, batch: Dict[str, Tensor], validating: Optional[bool] = False) -> Dict[str, Tensor]:
 
         inputs = batch['img']
         labels = batch['bounding_box']
@@ -53,7 +44,7 @@ class RacingF1Detector(pl.LightningModule):
         targets = list()
         for i, label in enumerate(labels):
 
-            bbox = [label[0], label[1] - label[3], label[0] + label[2], label[1]]
+            bbox = [label[0], label[1], label[0] + label[2], label[1] + label[3]]
             bbox_is_invalid = bbox[0] == bbox[2] or bbox[1] == bbox[3] # bounding box area is 0
             
             if bbox_is_invalid:
@@ -65,7 +56,7 @@ class RacingF1Detector(pl.LightningModule):
 
         out_dict = self.forward(inputs, targets)
 
-        if self.training:
+        if self.training or validating:
             # out_dict: Dict[str, Tensor]
             loss = sum(loss for loss in out_dict.values())
             return { 'loss': loss }
@@ -87,7 +78,7 @@ class RacingF1Detector(pl.LightningModule):
             predictions = [boxes[i].tolist() for boxes, i in zip(boxes, best_score_idxs)]
             new_out['predictions'] = torch.tensor(predictions)
 
-            return new_out
+            return out_dict # testing the mAP
 
 
     def training_step(self, batch: Dict[str, Tensor], batch_idx: int) -> Tensor:
@@ -102,23 +93,14 @@ class RacingF1Detector(pl.LightningModule):
 
 
     def validation_step(self, batch: Dict[str, Tensor], batch_idx: int) -> None:
-
-        out = self.step(batch)
-
-        predictions = out['predictions']
-        labels = batch['bounding_box']
-
-        accuracy = self.val_acc(predictions, labels)
-        f1_score = self.val_f1(predictions, labels)
-
-        self.log_dict({
-                'val_acc': accuracy,
-                'val_f1': f1_score,
-            },
-            prog_bar=True,
-            on_step=True,
-            on_epoch=True,
-        )
+        
+        self.model.train()
+        
+        out = self.step(batch, validating=True)
+        
+        loss = out['loss']
+        
+        self.log('val_loss', loss, prog_bar=True, logger=True)
 
 
     def test_step(self, batch: Dict[str, Tensor], batch_idx: int) -> None:
@@ -128,21 +110,12 @@ class RacingF1Detector(pl.LightningModule):
         predictions = out['predictions']
         labels = batch['bounding_box']
 
-        accuracy = self.test_acc(predictions, labels)
-        f1_score = self.test_f1(predictions, labels)
+        self.test_mAP.update(predictions, labels)
+        result = self.test_mAP.compute()
 
-        self.log_dict({
-                'test_acc': accuracy,
-                'test_f1': f1_score,
-            },
-            prog_bar=True,
-            on_step=True,
-            on_epoch=True,
-        )
+        self.log('test_mAP', result, logger=True, prog_bar=True)
 
 
     def configure_optimizers(self):
-
         params = [p for p in self.model.parameters() if p.requires_grad]
-
-        return torch.optim.Adam(params)
+        return torch.optim.SGD(params, lr=0.005, momentum=0.9, weight_decay=0.0005)
