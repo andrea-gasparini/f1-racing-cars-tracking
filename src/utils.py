@@ -1,6 +1,5 @@
 from collections import Counter
 import os
-import torch
 
 from torch import Tensor
 from typing import List, Optional
