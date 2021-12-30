@@ -30,7 +30,7 @@ class CustomRescale(object):
         y_new = int(b_box[1]/(image.height/new_h))
         # Example of re-scaling [291, 63, 32, 13] -> [68, 25, ?, ?]
         # 1. 291 : 32 = 68 : x -> 32 * 68 / 291
-        w_new = int(b_box[2] * x_new / b_box[0])
-        h_new = int(b_box[3] * y_new / b_box[1])
+        w_new = int(b_box[2]/(image.width/new_w))
+        h_new = int(b_box[3]/(image.height/new_h))
 
         return { 'img': img, 'bounding_box': [x_new, y_new, w_new, h_new] }

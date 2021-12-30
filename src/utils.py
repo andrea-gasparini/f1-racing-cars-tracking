@@ -9,7 +9,6 @@ from torch.utils.data.dataset import Dataset, Subset
 from torch.utils.data import random_split
 from PIL import Image, ImageDraw
 from torchvision import transforms
-from torchvision.ops.boxes import box_iou
 
 
 def join_dirs(base_dir: str, subdirs: List[str]) -> List[str]:
@@ -26,7 +25,7 @@ def image_to_tensor(image: Image.Image) -> Tensor:
 
 def draw_bounding_box(img: Image.Image, bounding_box: List[int]) -> Image.Image:
 
-	shape = [(bounding_box[0], bounding_box[1]), (bounding_box[0] + bounding_box[2], bounding_box[1] + bounding_box[3])]
+	shape = [(bounding_box[0], bounding_box[1]), (bounding_box[2], bounding_box[3])]
 	image_with_bounding_box = img.copy()
 	draw_bounding_box = ImageDraw.Draw(image_with_bounding_box)
 	draw_bounding_box.rectangle(shape, outline='red')

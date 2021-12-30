@@ -26,8 +26,6 @@ class RacingF1Detector(pl.LightningModule):
 
         # metrics to track
         self.test_mAP = torchmetrics.MAP() # https://torchmetrics.readthedocs.io/en/latest/references/modules.html#map
-        
-
 
     def forward(self, x: Tensor, y: Optional[Tensor] = None,
                 **kwargs) -> Union[Dict[str, Tensor], List[Dict[str, Tensor]]]:
@@ -44,14 +42,13 @@ class RacingF1Detector(pl.LightningModule):
         targets = list()
         for i, label in enumerate(labels):
 
-            bbox = [label[0], label[1], label[0] + label[2], label[1] + label[3]]
-            bbox_is_invalid = bbox[0] == bbox[2] or bbox[1] == bbox[3] # bounding box area is 0
+            bbox_is_invalid = label[0] == label[2] or label[1] == label[3] # bounding box area is 0
             
             if bbox_is_invalid:
                 # remove sample from inputs tensor
                 inputs = torch.cat([inputs[0:i], inputs[i+1:]])
             else:
-                bbox = torch.FloatTensor(bbox).unsqueeze(0).to(self.device)
+                bbox = torch.FloatTensor(label).unsqueeze(0).to(self.device)
                 targets.append({ 'boxes': bbox, 'labels': target_labels })
 
         out_dict = self.forward(inputs, targets)
@@ -93,8 +90,6 @@ class RacingF1Detector(pl.LightningModule):
 
 
     def validation_step(self, batch: Dict[str, Tensor], batch_idx: int) -> None:
-        
-        self.model.train()
         
         out = self.step(batch, validating=True)
         

@@ -43,6 +43,15 @@ class RacingF1Dataset(Dataset):
     def __preprocess_sample(self, idx: int) -> Dict[str, Tensor]:
         sample_bounding_box: List[int] = self.samples[idx]['bounding_box']
         img: Image.Image = Image.open(self.samples[idx]['img_path'])
+
+        # map [xmin, ymin, width, height] to [xmin, ymin, xmax, ymax] convention
+        # where (0,0) is the bottom-left corner
+        sample_bounding_box = [
+            sample_bounding_box[0],
+            sample_bounding_box[1],
+            sample_bounding_box[0] + sample_bounding_box[2],
+            sample_bounding_box[1] + sample_bounding_box[3]
+        ]
         
         if self.transforms:
             transformed_sample = self.transforms((img, sample_bounding_box))
