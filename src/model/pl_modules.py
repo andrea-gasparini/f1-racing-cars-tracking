@@ -26,13 +26,14 @@ class RacingF1Detector(pl.LightningModule):
 
         # metrics to track
         self.test_mAP = torchmetrics.MAP() # https://torchmetrics.readthedocs.io/en/latest/references/modules.html#map
-
+        self.val_mAP = torchmetrics.MAP()
+        
     def forward(self, x: Tensor, y: Optional[Tensor] = None,
                 **kwargs) -> Union[Dict[str, Tensor], List[Dict[str, Tensor]]]:
         out = self.model(x, y)
         return out
 
-    def step(self, batch: Dict[str, Tensor], compute_loss: bool = False) -> Dict[str, Tensor]:
+    def step(self, batch: Dict[str, Tensor]) -> Dict[str, Tensor]:
 
         inputs = batch['img']
         labels = batch['bounding_box']
@@ -53,7 +54,7 @@ class RacingF1Detector(pl.LightningModule):
 
         out_dict = self.forward(inputs, targets)
 
-        if self.training or compute_loss:
+        if self.training:
             # out_dict: Dict[str, Tensor]
             loss = sum(loss for loss in out_dict.values())
             return { 'loss': loss }
@@ -91,11 +92,15 @@ class RacingF1Detector(pl.LightningModule):
 
     def validation_step(self, batch: Dict[str, Tensor], batch_idx: int) -> None:
         
-        out = self.step(batch, compute_loss=True)
+        out = self.step(batch)
         
-        loss = out['loss']
-        
-        self.log('val_loss', loss, prog_bar=True, logger=True)
+        predictions = out['predictions']
+        labels = batch['bounding_box']
+
+        self.val_mAP.update(predictions, labels)
+        result = self.val_mAP.compute()
+
+        self.log('val_mAP', result, logger=True, prog_bar=True)
 
 
     def test_step(self, batch: Dict[str, Tensor], batch_idx: int) -> None:
