@@ -3,3 +3,4 @@ pytorch
 pytorch-lightning
 torchvision
 jupyter
+pycocotools
