@@ -103,7 +103,7 @@ class RacingF1Detector(pl.LightningModule):
             )
         ]
 
-        self.val_mAP.update(predictions, labels)
+        self.val_mAP.update(predictions, target)
         result = self.val_mAP.compute()
 
         self.log('val_mAP', result, logger=True, prog_bar=True)
