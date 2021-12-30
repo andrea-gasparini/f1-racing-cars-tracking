@@ -94,8 +94,14 @@ class RacingF1Detector(pl.LightningModule):
         
         out = self.step(batch)
         
-        predictions = out['predictions']
+        predictions = out
         labels = batch['bounding_box']
+        target = [
+            dict(
+                boxes = labels,
+                labels = torch.tensor([1 for i in range(len(batch))], device=self.device)
+            )
+        ]
 
         self.val_mAP.update(predictions, labels)
         result = self.val_mAP.compute()
@@ -106,11 +112,17 @@ class RacingF1Detector(pl.LightningModule):
     def test_step(self, batch: Dict[str, Tensor], batch_idx: int) -> None:
 
         out = self.step(batch)
-
-        predictions = out['predictions']
+        
+        predictions = out
         labels = batch['bounding_box']
+        target = [
+            dict(
+                boxes = labels,
+                labels = torch.tensor([1 for i in range(len(batch))], device=self.device)
+            )
+        ]
 
-        self.test_mAP.update(predictions, labels)
+        self.test_mAP.update(predictions, target)
         result = self.test_mAP.compute()
 
         self.log('test_mAP', result, logger=True, prog_bar=True)
