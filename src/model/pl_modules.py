@@ -32,7 +32,7 @@ class RacingF1Detector(pl.LightningModule):
         out = self.model(x, y)
         return out
 
-    def step(self, batch: Dict[str, Tensor], validating: Optional[bool] = False) -> Dict[str, Tensor]:
+    def step(self, batch: Dict[str, Tensor], compute_loss: bool = False) -> Dict[str, Tensor]:
 
         inputs = batch['img']
         labels = batch['bounding_box']
@@ -48,12 +48,12 @@ class RacingF1Detector(pl.LightningModule):
                 # remove sample from inputs tensor
                 inputs = torch.cat([inputs[0:i], inputs[i+1:]])
             else:
-                bbox = torch.FloatTensor(label).unsqueeze(0).to(self.device)
+                bbox = label.unsqueeze(0).to(self.device)
                 targets.append({ 'boxes': bbox, 'labels': target_labels })
 
         out_dict = self.forward(inputs, targets)
 
-        if self.training or validating:
+        if self.training or compute_loss:
             # out_dict: Dict[str, Tensor]
             loss = sum(loss for loss in out_dict.values())
             return { 'loss': loss }
@@ -91,7 +91,7 @@ class RacingF1Detector(pl.LightningModule):
 
     def validation_step(self, batch: Dict[str, Tensor], batch_idx: int) -> None:
         
-        out = self.step(batch, validating=True)
+        out = self.step(batch, compute_loss=True)
         
         loss = out['loss']
         
@@ -113,4 +113,6 @@ class RacingF1Detector(pl.LightningModule):
 
     def configure_optimizers(self):
         params = [p for p in self.model.parameters() if p.requires_grad]
-        return torch.optim.SGD(params, lr=0.005, momentum=0.9, weight_decay=0.0005)
+        return torch.optim.SGD(params, lr=self.hparams["lr"],
+									   momentum=self.hparams['momentum'],
+									   weight_decay=self.hparams['weight_decay'])
