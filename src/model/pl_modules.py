@@ -76,7 +76,7 @@ class RacingF1Detector(pl.LightningModule):
             predictions = [boxes[i].tolist() for boxes, i in zip(boxes, best_score_idxs)]
             new_out['predictions'] = torch.tensor(predictions)
 
-            return out_dict # testing the mAP
+            return new_out
 
 
     def training_step(self, batch: Dict[str, Tensor], batch_idx: int) -> Tensor:
