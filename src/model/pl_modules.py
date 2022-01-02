@@ -2,7 +2,7 @@ import pytorch_lightning as pl
 import torch
 import torchmetrics
 
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Tuple
 from torch import Tensor
 from torchvision import models
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
@@ -25,7 +25,8 @@ class RacingF1Detector(pl.LightningModule):
         self.model.roi_heads.box_predictor = FastRCNNPredictor(in_features, self.NUM_CLASSES)
 
         # metrics to track
-        self.test_mAP = torchmetrics.MAP() # https://torchmetrics.readthedocs.io/en/latest/references/modules.html#map
+        # https://torchmetrics.readthedocs.io/en/latest/references/modules.html#map
+        self.test_mAP = torchmetrics.MAP()
         self.val_mAP = torchmetrics.MAP()
         
     def forward(self, x: Tensor, y: Optional[Tensor] = None,
@@ -33,7 +34,7 @@ class RacingF1Detector(pl.LightningModule):
         out = self.model(x, y)
         return out
 
-    def step(self, batch: Dict[str, Tensor]) -> Dict[str, Tensor]:
+    def step(self, batch: Dict[str, Tensor]) -> Tuple[Dict[str, Tensor], Dict[str, Tensor]]:
 
         inputs = batch['img']
         labels = batch['bounding_box']
@@ -58,26 +59,9 @@ class RacingF1Detector(pl.LightningModule):
             # out_dict: Dict[str, Tensor]
             loss = sum(loss for loss in out_dict.values())
             return { 'loss': loss }
-        else:
-            # out_dict: List[Dict[str, Tensor]]
-            new_out: Dict[str, Tensor] = dict()
-
-            for out_sample in out_dict:
-                for key, value in out_sample.items():
-
-                    unsq_value = value.unsqueeze(0)
-
-                    if key not in new_out: new_out[key] = unsq_value
-                    else: new_out[key] = torch.cat((new_out[key], unsq_value))
-
-            boxes = new_out['boxes']
-            best_score_idxs = new_out['scores'].argmax(1)
-
-            predictions = [boxes[i].tolist() for boxes, i in zip(boxes, best_score_idxs)]
-            new_out['predictions'] = torch.tensor(predictions)
-
-            return new_out
-
+        
+        # out_dict: List[Dict[str, Tensor]]
+        return out_dict, targets
 
     def training_step(self, batch: Dict[str, Tensor], batch_idx: int) -> Tensor:
 
@@ -89,44 +73,25 @@ class RacingF1Detector(pl.LightningModule):
 
         return loss
 
-
     def validation_step(self, batch: Dict[str, Tensor], batch_idx: int) -> None:
         
-        out = self.step(batch)
-        
-        predictions = out
-        labels = batch['bounding_box']
-        target = [
-            dict(
-                boxes = labels,
-                labels = torch.tensor([1 for i in range(len(batch))], device=self.device)
-            )
-        ]
+        out, targets = self.step(batch)
 
-        self.val_mAP.update(predictions, target)
+        self.val_mAP.update(out, targets)
         result = self.val_mAP.compute()
 
-        self.log('val_mAP', result, logger=True, prog_bar=True)
-
+        self.log('val_mAP', result['map'], logger=True, prog_bar=True)
+        self.log('val_mAR', result['mar'], logger=True, prog_bar=True)
 
     def test_step(self, batch: Dict[str, Tensor], batch_idx: int) -> None:
 
-        out = self.step(batch)
+        out, targets = self.step(batch)
         
-        predictions = out
-        labels = batch['bounding_box']
-        target = [
-            dict(
-                boxes = labels,
-                labels = torch.tensor([1 for i in range(len(batch))], device=self.device)
-            )
-        ]
-
-        self.test_mAP.update(predictions, target)
+        self.test_mAP.update(out, targets)
         result = self.test_mAP.compute()
 
-        self.log('test_mAP', result, logger=True, prog_bar=True)
-
+        self.log('test_mAP', result['map'], logger=True, prog_bar=True)
+        self.log('test_mAR', result['mar'], logger=True, prog_bar=True)
 
     def configure_optimizers(self):
         params = [p for p in self.model.parameters() if p.requires_grad]

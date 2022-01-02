@@ -1,8 +1,8 @@
-from collections import Counter
 import os
+import torch
 
 from torch import Tensor
-from typing import List, Optional
+from typing import List, Optional, Dict
 from torch._C import Generator, default_generator
 from torch.functional import Tensor
 from torch.utils.data.dataset import Dataset, Subset
@@ -45,6 +45,25 @@ def random_split_dataset(dataset: Dataset, train_size: float, test_size: float,
 
     return random_split(dataset, generator=generator, lengths=[train_size, test_size, val_size])
 
+
+def collate_fasterrcnn_predictions(out_dict: List[Dict[str, Tensor]]):
+	new_out: Dict[str, Tensor] = dict()
+
+	for out_sample in out_dict:
+		for key, value in out_sample.items():
+
+			unsq_value = value.unsqueeze(0)
+
+			if key not in new_out: new_out[key] = unsq_value
+			else: new_out[key] = torch.cat((new_out[key], unsq_value))
+
+	boxes = new_out['boxes']
+	best_score_idxs = new_out['scores'].argmax(1)
+
+	predictions = [boxes[i].tolist() for boxes, i in zip(boxes, best_score_idxs)]
+	new_out['predictions'] = torch.tensor(predictions)
+
+	return new_out
 
 
 	
