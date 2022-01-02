@@ -32,46 +32,43 @@ class RacingF1Dataset(Dataset):
                         groundtruth_values = value.strip().split(',')
                         imgs_list[idx]['bounding_box'] = [int(groundtruth_values[0]), int(groundtruth_values[1]), int(groundtruth_values[2]), int(groundtruth_values[3])]
             self.samples += imgs_list
-
         
     def random_split(self, train_size: float, test_size: float, val_size: Optional[float] = None,
                     generator: Generator = default_generator) -> List['RacingF1Dataset']:
 
         return random_split_dataset(self, train_size, test_size, val_size, generator)
-
     
     def __preprocess_sample(self, idx: int) -> Dict[str, Tensor]:
-        sample_bounding_box: List[int] = self.samples[idx]['bounding_box']
+
         img: Image.Image = Image.open(self.samples[idx]['img_path'])
 
-        # map [xmin, ymin, width, height] to [xmin, ymin, xmax, ymax] convention
-        # where (0,0) is the bottom-left corner
-        sample_bounding_box = [
-            sample_bounding_box[0],
-            sample_bounding_box[1],
-            sample_bounding_box[0] + sample_bounding_box[2],
-            sample_bounding_box[1] + sample_bounding_box[3]
-        ]
+        if 'bounding_box' in self.samples[idx]:
+            sample_bounding_box: List[int] = self.samples[idx]['bounding_box']
+            # map [xmin, ymin, width, height] to [xmin, ymin, xmax, ymax] convention
+            # where (0,0) is the bottom-left corner
+            sample_bounding_box = [
+                sample_bounding_box[0],
+                sample_bounding_box[1],
+                sample_bounding_box[0] + sample_bounding_box[2],
+                sample_bounding_box[1] + sample_bounding_box[3]
+            ]
+            
+            if self.transforms:
+                transformed_sample = self.transforms((img, sample_bounding_box))
+                img = transformed_sample['img']
+                sample_bounding_box = transformed_sample['bounding_box']
+
+            return {
+                'img': image_to_tensor(img),
+                'bounding_box': torch.tensor(sample_bounding_box)
+            }
         
-        if self.transforms:
-            transformed_sample = self.transforms((img, sample_bounding_box))
-            img = transformed_sample['img']
-            sample_bounding_box = transformed_sample['bounding_box']
-
-        return {
-            'img': image_to_tensor(img),
-            'bounding_box': torch.tensor(sample_bounding_box)
-        }
-
+        return { 'img': image_to_tensor(img) }
 
     def __len__(self) -> int:
         return len(self.samples)
 
-
     def __getitem__(self, idx: int) -> Dict[str, Tensor]:
         preprocessed_sample = self.__preprocess_sample(idx)
 
-        return {
-            'img': preprocessed_sample['img'],
-            'bounding_box': preprocessed_sample['bounding_box']
-        }
+        return preprocessed_sample
