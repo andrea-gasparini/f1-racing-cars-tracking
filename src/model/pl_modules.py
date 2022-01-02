@@ -81,7 +81,7 @@ class RacingF1Detector(pl.LightningModule):
         result = self.val_mAP.compute()
 
         self.log('val_mAP', result['map'], logger=True, prog_bar=True)
-        self.log('val_mAR', result['mar'], logger=True, prog_bar=True)
+        self.log('val_mAR', result['mar_1'], logger=True, prog_bar=True)
 
     def test_step(self, batch: Dict[str, Tensor], batch_idx: int) -> None:
 
@@ -91,7 +91,7 @@ class RacingF1Detector(pl.LightningModule):
         result = self.test_mAP.compute()
 
         self.log('test_mAP', result['map'], logger=True, prog_bar=True)
-        self.log('test_mAR', result['mar'], logger=True, prog_bar=True)
+        self.log('test_mAR', result['mar_1'], logger=True, prog_bar=True)
 
     def configure_optimizers(self):
         params = [p for p in self.model.parameters() if p.requires_grad]
