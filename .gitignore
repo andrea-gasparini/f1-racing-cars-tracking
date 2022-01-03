@@ -2,7 +2,4 @@ __pycache__
 .ipynb_checkpoints
 lightning_logs
 tb_logs
-src/application/out_frames
-src/application/model.ckpt
-src/application/*.avi
-src/application/*.mp4
+src/application/data

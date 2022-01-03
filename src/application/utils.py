@@ -37,7 +37,7 @@ def merge_frames_to_video(path: str, out_path: str, fps: int = 60) -> None:
     img_array = list()
 
     # Read frames from directory
-    pbar = tqdm(sorted(os.listdir(os.path.join(path))))
+    pbar = tqdm(sorted(f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))))
     for filename in pbar:
         pbar.set_description(f"Reading {filename}")
         img = cv2.imread(os.path.join(path, filename))
@@ -69,18 +69,16 @@ def generate_bounding_boxes(model_ckpt_path: str, frames_path: str, size_dirs: i
     model = RacingF1Detector.load_from_checkpoint(model_ckpt_path)
     model.eval()
     
-    images_dir = sorted(f for f in os.listdir(os.path.join(frames_path)) if os.path.isfile(os.path.join(frames_path, f)))
-    
-    #print(images_dir)
+    images_dir = sorted(f for f in os.listdir(frames_path) if os.path.isfile(os.path.join(frames_path, f)))
+
     for images_dir_chunk in chunks(images_dir, size_dirs):
         images = []
 
         pbar = tqdm(images_dir_chunk)
         for image_name in pbar:
             image_full_path = os.path.join(frames_path, image_name)
-            if os.path.isfile(image_full_path):
-                pbar.set_description(f"Reading {image_name}")
-                images.append(image_to_tensor(Image.open(image_full_path)))
+            pbar.set_description(f"Reading {image_name}")
+            images.append(image_to_tensor(Image.open(image_full_path)))
             
 
         print("Computing predictions...")
@@ -89,11 +87,9 @@ def generate_bounding_boxes(model_ckpt_path: str, frames_path: str, size_dirs: i
         pbar = tqdm(enumerate(images_dir_chunk))
         for idx, image_name in pbar:
             image_full_path = os.path.join(frames_path, image_name)
-            if os.path.isfile(image_full_path):
-                pbar.set_description(f"Drawing bounding box on {image_name}")
-                #print(idx)
-                img = draw_bounding_box(Image.open(image_full_path), outputs[idx]['boxes'][0])
-                img.save(os.path.join(frames_path, 'bounding_box/') + image_name, "JPEG")
+            pbar.set_description(f"Drawing bounding box on {image_name}")
+            img = draw_bounding_box(Image.open(image_full_path), outputs[idx]['boxes'][0])
+            img.save(os.path.join(frames_path, 'bounding_box') + image_name, "JPEG")
                     
         images = []
     
