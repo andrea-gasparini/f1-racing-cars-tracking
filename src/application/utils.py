@@ -65,15 +65,14 @@ def chunks(lst, n):
         yield lst[i:i + n]
 
 
-def generate_bounding_boxes(model_ckpt_path: str, frames_path: str) -> None:
+def generate_bounding_boxes(model_ckpt_path: str, frames_path: str, size_dirs: int = 5) -> None:
     model = RacingF1Detector.load_from_checkpoint(model_ckpt_path)
     model.eval()
     
-    images_dir = sorted(os.listdir(os.path.join(frames_path)))
+    images_dir = sorted(f for f in os.listdir(os.path.join(frames_path)) if os.path.isfile(os.path.join(frames_path, f)))
     
-    
-    for images_dir_chunk in chunks(images_dir, 32):
-
+    #print(images_dir)
+    for images_dir_chunk in chunks(images_dir, size_dirs):
         images = []
 
         pbar = tqdm(images_dir_chunk)
@@ -83,6 +82,7 @@ def generate_bounding_boxes(model_ckpt_path: str, frames_path: str) -> None:
                 pbar.set_description(f"Reading {image_name}")
                 images.append(image_to_tensor(Image.open(image_full_path)))
             
+
         print("Computing predictions...")
         outputs = model(images)
         
@@ -91,8 +91,9 @@ def generate_bounding_boxes(model_ckpt_path: str, frames_path: str) -> None:
             image_full_path = os.path.join(frames_path, image_name)
             if os.path.isfile(image_full_path):
                 pbar.set_description(f"Drawing bounding box on {image_name}")
+                #print(idx)
                 img = draw_bounding_box(Image.open(image_full_path), outputs[idx]['boxes'][0])
-                img.save(os.path.join(frames_path, 'bounding_box'))
+                img.save(os.path.join(frames_path, 'bounding_box/') + image_name, "JPEG")
                     
         images = []
     
