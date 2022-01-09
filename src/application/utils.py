@@ -1,5 +1,6 @@
 import cv2
 import os
+import torchvision
 
 from tqdm import tqdm
 
@@ -65,6 +66,19 @@ def chunks(lst, n):
         yield lst[i:i + n]
 
 
+def apply_nms(orig_prediction, iou_thresh=0.3):
+    
+    # torchvision returns the indices of the bboxes to keep
+    keep = torchvision.ops.nms(orig_prediction['boxes'], orig_prediction['scores'], iou_thresh)
+    
+    final_prediction = orig_prediction
+    final_prediction['boxes'] = final_prediction['boxes'][keep]
+    final_prediction['scores'] = final_prediction['scores'][keep]
+    final_prediction['labels'] = final_prediction['labels'][keep]
+    
+    return final_prediction
+
+
 def generate_bounding_boxes(model_ckpt_path: str, frames_path: str, size_dirs: int = 5) -> None:
     model = RacingF1Detector.load_from_checkpoint(model_ckpt_path)
     model.eval()
@@ -88,7 +102,8 @@ def generate_bounding_boxes(model_ckpt_path: str, frames_path: str, size_dirs: i
         for idx, image_name in pbar:
             image_full_path = os.path.join(frames_path, image_name)
             pbar.set_description(f"Drawing bounding box on {image_name}")
-            img = draw_bounding_box(Image.open(image_full_path), outputs[idx]['boxes'][0])
+            pred = apply_nms(outputs)
+            img = draw_bounding_box(Image.open(image_full_path), pred)
             img.save(os.path.join(frames_path, 'bounding_box') + image_name, "JPEG")
                     
         images = []
