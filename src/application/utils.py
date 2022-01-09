@@ -103,7 +103,7 @@ def generate_bounding_boxes(model_ckpt_path: str, frames_path: str, size_dirs: i
             image_full_path = os.path.join(frames_path, image_name)
             pbar.set_description(f"Drawing bounding box on {image_name}")
             pred = apply_nms(outputs[idx])
-            img = draw_bounding_box(Image.open(image_full_path), pred)
+            img = draw_bounding_box(Image.open(image_full_path), pred["boxes"])
             img.save(os.path.join(frames_path, 'bounding_box') + image_name, "JPEG")
                     
         images = []
