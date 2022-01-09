@@ -23,14 +23,16 @@ def image_to_tensor(image: Image.Image) -> Tensor:
 	return transforms.ToTensor()(image)
 
 
-def draw_bounding_box(img: Image.Image, bounding_box: List[int]) -> Image.Image:
+def draw_bounding_box(img: Image.Image, bounding_box: List[List[int]]) -> Image.Image:
 
-	shape = [(bounding_box[0], bounding_box[1]), (bounding_box[2], bounding_box[3])]
-	image_with_bounding_box = img.copy()
-	draw_bounding_box = ImageDraw.Draw(image_with_bounding_box)
-	draw_bounding_box.rectangle(shape, outline='red')
+  image_with_bounding_box = img.copy()
+  for bbox in bounding_box:
+    image_with_bounding_box = image_with_bounding_box.copy()
+    shape = [(bbox[0], bbox[1]), (bbox[2], bbox[3])]
+    draw_bounding_box = ImageDraw.Draw(image_with_bounding_box)
+    draw_bounding_box.rectangle(shape, outline='red')
 
-	return image_with_bounding_box
+  return image_with_bounding_box
 
 
 def random_split_dataset(dataset: Dataset, train_size: float, test_size: float,
