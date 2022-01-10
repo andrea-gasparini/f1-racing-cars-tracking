@@ -78,6 +78,15 @@ def apply_nms(orig_prediction, iou_thresh=0.3):
     
     return final_prediction
 
+def remove_low_scores(orig_prediction, score_thresh=0.2):
+  final_prediction = {"boxes": [], "scores": [], "labels": []}
+  for idx, item in enumerate(orig_prediction["scores"]):
+    if item > score_thresh:
+      final_prediction["boxes"].append(orig_prediction["boxes"][idx])
+      final_prediction["scores"].append(item)
+      final_prediction["labels"].append(1)
+  
+  return final_prediction
 
 def generate_bounding_boxes(model_ckpt_path: str, frames_path: str, size_dirs: int = 5) -> None:
     model = RacingF1Detector.load_from_checkpoint(model_ckpt_path)
@@ -85,6 +94,7 @@ def generate_bounding_boxes(model_ckpt_path: str, frames_path: str, size_dirs: i
     
     images_dir = sorted(f for f in os.listdir(frames_path) if os.path.isfile(os.path.join(frames_path, f)))
 
+    output_boxes = {}
     for images_dir_chunk in chunks(images_dir, size_dirs):
         images = []
 
@@ -102,11 +112,14 @@ def generate_bounding_boxes(model_ckpt_path: str, frames_path: str, size_dirs: i
         for idx, image_name in pbar:
             image_full_path = os.path.join(frames_path, image_name)
             pbar.set_description(f"Drawing bounding box on {image_name}")
+            pred = remove_low_scores(outputs[idx])
             pred = apply_nms(outputs[idx])
             img = draw_bounding_box(Image.open(image_full_path), pred["boxes"])
-            img.save(os.path.join(frames_path, 'bounding_box') + image_name, "JPEG")
+            output_boxes[image_name] = {"scores": pred["scores"], "boxes": pred["boxes"]}
+            img.save(os.path.join(frames_path, 'bounding_box') + '/' + image_name, "JPEG")
                     
         images = []
+    return output_boxes
     
     
     
