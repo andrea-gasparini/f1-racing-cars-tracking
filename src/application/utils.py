@@ -18,6 +18,9 @@ def split_video_to_frames(path: str, output_path: str, zfill: int = 4) -> None:
 
     if not os.path.isfile(path):
         raise ValueError(f"Expected {path} to be a full path to a video file")
+
+    if not os.path.isdir(output_path):
+        os.mkdir(output_path)
     
     video_capture = cv2.VideoCapture(path)
     success, image = video_capture.read()
@@ -78,6 +81,7 @@ def apply_nms(orig_prediction, iou_thresh=0.3):
     
     return final_prediction
 
+
 def remove_low_scores(orig_prediction, score_thresh=0.2):
   final_prediction = {"boxes": [], "scores": [], "labels": []}
   for idx, item in enumerate(orig_prediction["scores"]):
@@ -87,6 +91,7 @@ def remove_low_scores(orig_prediction, score_thresh=0.2):
       final_prediction["labels"].append(1)
   
   return final_prediction
+
 
 def generate_bounding_boxes(model_ckpt_path: str, frames_path: str, size_dirs: int = 5) -> None:
     model = RacingF1Detector.load_from_checkpoint(model_ckpt_path)
@@ -107,6 +112,11 @@ def generate_bounding_boxes(model_ckpt_path: str, frames_path: str, size_dirs: i
 
         print("Computing predictions...")
         outputs = model(images)
+
+        output_path = os.path.join(frames_path, 'bounding_box')
+
+        if not os.path.isdir(output_path):
+            os.mkdir(output_path)
         
         pbar = tqdm(enumerate(images_dir_chunk))
         for idx, image_name in pbar:
@@ -116,7 +126,7 @@ def generate_bounding_boxes(model_ckpt_path: str, frames_path: str, size_dirs: i
             pred = apply_nms(outputs[idx])
             img = draw_bounding_box(Image.open(image_full_path), pred["boxes"])
             output_boxes[image_name] = {"scores": pred["scores"], "boxes": pred["boxes"]}
-            img.save(os.path.join(frames_path, 'bounding_box') + '/' + image_name, "JPEG")
+            img.save(os.path.join(output_path, image_name), "JPEG")
                     
         images = []
     return output_boxes
