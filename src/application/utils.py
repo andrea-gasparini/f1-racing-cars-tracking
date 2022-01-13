@@ -71,7 +71,7 @@ def chunks(lst, n):
         yield lst[i:i + n]
 
 
-def apply_nms(orig_prediction, iou_thresh=0.3):
+def apply_nms(orig_prediction, iou_thresh: float):
     
     # torchvision returns the indices of the bboxes to keep
     keep = torchvision.ops.nms(orig_prediction['boxes'], orig_prediction['scores'], iou_thresh)
@@ -84,7 +84,7 @@ def apply_nms(orig_prediction, iou_thresh=0.3):
     return final_prediction
 
 
-def remove_low_scores(orig_prediction, score_thresh=0.2):
+def remove_low_scores(orig_prediction, score_thresh: float):
   final_prediction = {"boxes": [], "scores": [], "labels": []}
   for idx, item in enumerate(orig_prediction["scores"]):
     if item > score_thresh:
@@ -95,7 +95,8 @@ def remove_low_scores(orig_prediction, score_thresh=0.2):
   return final_prediction
 
 
-def generate_bounding_boxes(model_ckpt_path: str, frames_path: str, size_dirs: int = 5) -> None:
+def generate_bounding_boxes(model_ckpt_path: str, frames_path: str, size_dirs: int = 5,
+                            score_thresh: float = 0.2, iou_thresh: float = 0.3) -> None:
     model = RacingF1Detector.load_from_checkpoint(model_ckpt_path)
     model.eval()
     
@@ -124,8 +125,8 @@ def generate_bounding_boxes(model_ckpt_path: str, frames_path: str, size_dirs: i
         for idx, image_name in pbar:
             image_full_path = os.path.join(frames_path, image_name)
             pbar.set_description(f"Drawing bounding box on {image_name}")
-            pred = remove_low_scores(outputs[idx])
-            pred = apply_nms(outputs[idx])
+            pred = remove_low_scores(outputs[idx], score_thresh)
+            pred = apply_nms(outputs[idx], iou_thresh)
             img = draw_bounding_box(Image.open(image_full_path), pred["boxes"])
             output_boxes[image_name] = {"scores": pred["scores"], "boxes": pred["boxes"]}
             img.save(os.path.join(output_path, image_name), "JPEG")
