@@ -116,22 +116,26 @@ def generate_bounding_boxes(model_ckpt_path: str, frames_path: str, size_dirs: i
         outputs = model(images)
 
         output_path = os.path.join(frames_path, 'bounding_box')
+        output_path_bbox = os.path.join(frames_path, 'txt_bounding_box')
 
         if not os.path.isdir(output_path):
             os.mkdir(output_path)
         
+        if not os.path.isdir(output_path_bbox):
+            os.mkdir(output_path_bbox)
+
         pbar = tqdm(enumerate(images_dir_chunk))
         for idx, image_name in pbar:
             image_full_path = os.path.join(frames_path, image_name)
             pbar.set_description(f"Drawing bounding box on {image_name}")
             pred = remove_low_scores(outputs[idx])
-            pred = apply_nms(outputs[idx])
+            pred = apply_nms(outputs[idx], iou_thresh=0.5)
+            with open(os.path.join(frames_path, 'txt_bounding_box', image_name.replace('.jpg', '.txt')), mode='w') as f:
+              json.dump(pred["boxes"].detach().numpy().tolist(), f)
             img = draw_bounding_box(Image.open(image_full_path), pred["boxes"])
-            output_boxes[image_name] = {"scores": pred["scores"], "boxes": pred["boxes"]}
-            img.save(os.path.join(output_path, image_name), "JPEG")
-                    
+            img.save(os.path.join(output_path, image_name), "JPEG")     
         images = []
-    return output_boxes
+    #return output_boxes
     
     
 def calculate_histogram_bounding_box(image_path: str, bbox_file_path: str):
