@@ -1,6 +1,8 @@
 import cv2
 import os
 import torchvision
+import json
+import matplotlib.pyplot as plt
 
 from tqdm import tqdm
 
@@ -132,6 +134,23 @@ def generate_bounding_boxes(model_ckpt_path: str, frames_path: str, size_dirs: i
     return output_boxes
     
     
+def calculate_histogram_bounding_box(image_path: str, bbox_file_path: str):
+    image = cv2.imread(image_path)
     
+    with open(bbox_file_path, mode='r') as f:
+        bounding_boxes = json.load(f)
     
+    histograms = []
+    for bbox in bounding_boxes:
+        bbox = [int(i) for i in bbox]
+        crop_img = image[bbox[1]+2:bbox[3]-2, bbox[0]+2:bbox[2]-2]
+        hist = cv2.calcHist([crop_img], [0, 1, 2], None, [256, 256, 256], [0, 256, 0, 256, 0, 256])
+        histograms.append(hist)
+    return histograms
     
+def calculate_histogram_distance(hist1, hist2, method=cv2.HISTCMP_INTERSECT):
+    hist1 = cv2.normalize(hist1, hist1)
+    hist2 = cv2.normalize(hist2, hist2)
+    
+    return cv2.compareHist(hist1, hist2, method)
+
