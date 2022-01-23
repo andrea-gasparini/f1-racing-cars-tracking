@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Union, Tuple
 from torch import Tensor
 from torchvision import models
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+from torchmetrics.detection.map import MeanAveragePrecision
 
 class RacingF1Detector(pl.LightningModule):
 
@@ -26,8 +27,8 @@ class RacingF1Detector(pl.LightningModule):
 
         # metrics to track
         # https://torchmetrics.readthedocs.io/en/latest/references/modules.html#map
-        self.test_mAP = torchmetrics.MAP()
-        self.val_mAP = torchmetrics.MAP()
+        self.test_mAP = MeanAveragePrecision()
+        self.val_mAP = MeanAveragePrecision()
         
     def forward(self, x: Tensor, y: Optional[Tensor] = None,
                 **kwargs) -> Union[Dict[str, Tensor], List[Dict[str, Tensor]]]:
