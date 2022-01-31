@@ -13,6 +13,7 @@ from src.data.datasets import RacingF1Dataset
 from src.model.pl_modules import RacingF1Detector
 from src.utils import image_to_tensor, draw_bounding_box
 from PIL import Image
+from typing import List
 
 def split_video_to_frames(path: str, output_path: str, zfill: int = 4) -> None:
 
@@ -153,6 +154,18 @@ def calculate_histogram_bounding_box(image_path: str, bbox_file_path: str):
         histograms.append(hist)
     return histograms
     
+    
+
+def calculate_histogram_from_coordinates(image_path: str, coordinates: List[int]):
+    image = cv2.imread(image_path)
+    histograms = []
+    coordinates = [int(i) for i in coordinates]
+    #for coord in coordinates:
+    crop_img = image[coordinates[1]+2:coordinates[3]-2, coordinates[0]+2:coordinates[2]-2]
+    hist = cv2.calcHist([crop_img], [0, 1, 2], None, [256, 256, 256], [0, 256, 0, 256, 0, 256])
+    histograms.append(hist)
+    return histograms
+
 def calculate_histogram_distance(hist1, hist2, method=cv2.HISTCMP_INTERSECT):
     hist1 = cv2.normalize(hist1, hist1)
     hist2 = cv2.normalize(hist2, hist2)
