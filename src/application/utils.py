@@ -3,6 +3,7 @@ import os
 import torchvision
 import json
 import matplotlib.pyplot as plt
+import math
 
 from tqdm import tqdm
 
@@ -172,3 +173,71 @@ def calculate_histogram_distance(hist1, hist2, method=cv2.HISTCMP_INTERSECT):
     
     return cv2.compareHist(hist1, hist2, method)
 
+
+
+def check_bounding_boxes(frames_path: str):
+    txt_path = os.path.join(frames_path, 'txt_bounding_box')
+    images_path = os.path.join(frames_path, 'bounding_box')
+    
+    images = os.listdir(images_path)
+    for i, image_name in enumerate(images):
+        
+        if i == len(images) -1:
+            # we do not need to check the last element.
+            break
+        
+        
+        first_image = os.path.join(images_path, image_name)
+        second_image = os.path.join(images_path, images[i + 1])
+        
+        with open(os.path.join(txt_path, image_name.replace('.jpg', '.txt')), mode='r') as f:
+            first_image_bbox = json.load(f)
+        
+        with open(os.path.join(txt_path, images[i + 1].replace('.jpg', '.txt')), mode='r') as f:
+            second_image_bbox = json.load(f)
+            
+
+        if len(first_image_bbox) > len(second_image_bbox):
+            pass
+        elif len(first_image_bbox) < len(second_image_bbox):
+            pass
+        else:
+            equal_bboxes_length(first_image_bbox, second_image_bbox, image_name, images[i + 1])
+            
+        
+        print(first_image_bbox, second_image_bbox)
+        break
+
+
+def calculate_centroids(x1, x2, y1, y2):
+    return((x1 + x2)/2, (y1 + y2)/2)
+
+
+def first_greater_second(first_bboxes: List[float], second_bboxes: List[float], first_image_name: str, second_image_name: str):
+    # case in which the prev frame has > bboxes than the second.
+    tmp_first_bboxes = first_bboxes
+    for first_bbox in first_bboxes:
+        for second_bbox in second_bboxes:
+            first_centroid = calculate_centroids(first_bbox[0], first_bbox[2], first_bbox[1], first_bbox[3])
+            second_centroid = calculate_centroids(second_bbox[0], second_bbox[2], second_bbox[1], second_bbox[3])
+            
+            distance = math.hypot(second_centroid[0] - first_centroid[0], second_centroid[1] - first_centroid[1])
+            if distance < 50: # threshold
+                tmp_first_bboxes.remove(first_bbox) # same bbox
+                break
+            
+    # now in tmp_first_bboxes we have only boxes to check with histograms.
+            
+            
+    
+
+def equal_bboxes_length(first_bboxes: List[float], second_bboxes: List[float], first_image_name: str, second_image_name: str):
+    for idx, bbox in enumerate(first_bboxes):
+        first_centroid = calculate_centroids(bbox[0], bbox[2], bbox[1], bbox[3])
+        second_centroid = calculate_centroids(second_bboxes[idx][0], second_bboxes[idx][2], second_bboxes[idx][1], second_bboxes[idx][3])
+        
+        distance = math.hypot(second_centroid[0] - first_centroid[0], second_centroid[1] - first_centroid[1])
+        
+        if distance > 50:
+            # they are, probably, two different bounding boxes and we need to check better
+            pass
