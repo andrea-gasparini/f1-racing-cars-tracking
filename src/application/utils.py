@@ -1,12 +1,12 @@
 import cv2
 import os
-from nbformat import write
 import torchvision
 import json
 import matplotlib.pyplot as plt
 import math
 
 from tqdm import tqdm
+from nbformat import write
 
 from pytorch_lightning import Trainer
 from torch.utils.data import DataLoader
@@ -99,7 +99,7 @@ def remove_low_scores(orig_prediction, score_thresh: float):
 
 
 def generate_bounding_boxes(model_ckpt_path: str, frames_path: str, size_dirs: int = 5,
-                            score_thresh: float = 0.2, iou_thresh: float = 0.5) -> None:
+                            score_thresh: float = 0.2, iou_thresh: float = 0.5, max_score: bool = False) -> None:
     model = RacingF1Detector.load_from_checkpoint(model_ckpt_path)
     model.eval()
     
@@ -132,11 +132,20 @@ def generate_bounding_boxes(model_ckpt_path: str, frames_path: str, size_dirs: i
         for idx, image_name in pbar:
             image_full_path = os.path.join(frames_path, image_name)
             pbar.set_description(f"Drawing bounding box on {image_name}")
-            pred = remove_low_scores(outputs[idx], score_thresh)
-            pred = apply_nms(outputs[idx], iou_thresh)
-            with open(os.path.join(frames_path, 'txt_bounding_box', image_name.replace('.jpg', '.txt')), mode='w') as f:
-              json.dump(pred["boxes"].detach().numpy().tolist(), f)
-            img = draw_bounding_box(Image.open(image_full_path), pred["boxes"])
+            
+            if len(outputs[idx]['boxes']) == 0:
+                continue
+            
+            if not max_score:
+                pred = remove_low_scores(outputs[idx], score_thresh)
+                pred = apply_nms(outputs[idx], iou_thresh)
+                with open(os.path.join(frames_path, 'txt_bounding_box', image_name.replace('.jpg', '.txt')), mode='w') as f:
+                    json.dump(pred["boxes"].detach().numpy().tolist(), f)
+                img = draw_bounding_box(Image.open(image_full_path), pred["boxes"])
+            else:
+                img = draw_bounding_box(Image.open(image_full_path), [outputs[idx]['boxes'][0]])
+                
+            
             img.save(os.path.join(output_path, image_name), "JPEG")     
         images = []
     #return output_boxes
