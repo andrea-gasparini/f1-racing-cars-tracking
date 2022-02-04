@@ -1,5 +1,6 @@
 import cv2
 import os
+from nbformat import write
 import torchvision
 import json
 import matplotlib.pyplot as plt
@@ -155,7 +156,6 @@ def calculate_histogram_bounding_box(image_path: str, bbox_file_path: str):
         histograms.append(hist)
     return histograms
     
-    
 
 def calculate_histogram_from_coordinates(image_path: str, coordinates: List[int]):
     image = cv2.imread(image_path)
@@ -166,6 +166,7 @@ def calculate_histogram_from_coordinates(image_path: str, coordinates: List[int]
     hist = cv2.calcHist([crop_img], [0, 1, 2], None, [256, 256, 256], [0, 256, 0, 256, 0, 256])
     histograms.append(hist)
     return histograms
+
 
 def calculate_histogram_distance(hist1, hist2, method=cv2.HISTCMP_INTERSECT):
     hist1 = cv2.normalize(hist1, hist1)
@@ -178,14 +179,15 @@ def calculate_histogram_distance(hist1, hist2, method=cv2.HISTCMP_INTERSECT):
 def check_bounding_boxes(frames_path: str):
     txt_path = os.path.join(frames_path, 'txt_bounding_box')
     images_path = os.path.join(frames_path, 'bounding_box')
+    output_dir = os.path.join(frames_path, 'bounding_box_hists')
     
     images = os.listdir(images_path)
-    for i, image_name in enumerate(images):
+    for i, image_name in tqdm(enumerate(images)):
         
+        #print("Current image", image_name)
         if i == len(images) -1:
             # we do not need to check the last element.
             break
-        
         
         first_image = os.path.join(images_path, image_name)
         second_image = os.path.join(images_path, images[i + 1])
@@ -198,22 +200,18 @@ def check_bounding_boxes(frames_path: str):
             
 
         if len(first_image_bbox) > len(second_image_bbox):
-            pass
+            first_greater_second(first_image_bbox, second_image_bbox, image_name, images[i + 1], images_path, output_dir, txt_path)
         elif len(first_image_bbox) < len(second_image_bbox):
-            pass
+            second_greater_first(first_image_bbox, second_image_bbox, image_name, images[i + 1], images_path, output_dir, txt_path)
         else:
-            equal_bboxes_length(first_image_bbox, second_image_bbox, image_name, images[i + 1])
-            
-        
-        print(first_image_bbox, second_image_bbox)
-        break
+            equal_bboxes_length(first_image_bbox, second_image_bbox, image_name, images[i + 1], images_path, output_dir, txt_path)
 
 
 def calculate_centroids(x1, x2, y1, y2):
-    return((x1 + x2)/2, (y1 + y2)/2)
+    return ((x1 + x2)/2, (y1 + y2)/2)
 
 
-def first_greater_second(first_bboxes: List[float], second_bboxes: List[float], first_image_name: str, second_image_name: str):
+def first_greater_second(first_bboxes: List[List[float]], second_bboxes: List[List[float]], first_image_name: str, second_image_name: str, images_path: str, output_dir: str, txt_path: str):
     # case in which the prev frame has > bboxes than the second.
     tmp_first_bboxes = first_bboxes
     for first_bbox in first_bboxes:
@@ -222,22 +220,77 @@ def first_greater_second(first_bboxes: List[float], second_bboxes: List[float], 
             second_centroid = calculate_centroids(second_bbox[0], second_bbox[2], second_bbox[1], second_bbox[3])
             
             distance = math.hypot(second_centroid[0] - first_centroid[0], second_centroid[1] - first_centroid[1])
-            if distance < 50: # threshold
+            if distance < 50 and distance > 1: # threshold
                 tmp_first_bboxes.remove(first_bbox) # same bbox
                 break
             
     # now in tmp_first_bboxes we have only boxes to check with histograms.
-            
-            
+    for bbox in tmp_first_bboxes:
+        histogram_frame_curr = calculate_histogram_from_coordinates(os.path.join(images_path, first_image_name), bbox)
+        histogram_frame_next = calculate_histogram_from_coordinates(os.path.join(images_path, second_image_name), bbox)
+        
+        hist_distance = calculate_histogram_distance(histogram_frame_curr[0], histogram_frame_next[0])
+        
+        if hist_distance < 3:
+            img = draw_bounding_box(Image.open(os.path.join(images_path, second_image_name)), [bbox])
+            img.save(os.path.join(output_dir, second_image_name), "JPEG")
+            second_bboxes.append(bbox)
     
+    write_new_bounding_box(os.path.join(txt_path, second_image_name.replace('.jpg', '.txt')), second_bboxes)
+            
+            
+def second_greater_first(first_bboxes: List[List[float]], second_bboxes: List[List[float]], first_image_name: str, second_image_name: str, images_path: str, output_dir: str, txt_path: str):
+    # case in which the prev frame has > bboxes than the second.
+    tmp_second_bboxes = second_bboxes
+    for second_bbox in second_bboxes:
+        for first_bbox in first_bboxes:
+            first_centroid = calculate_centroids(first_bbox[0], first_bbox[2], first_bbox[1], first_bbox[3])
+            second_centroid = calculate_centroids(second_bbox[0], second_bbox[2], second_bbox[1], second_bbox[3])
+            
+            distance = math.hypot(second_centroid[0] - first_centroid[0], second_centroid[1] - first_centroid[1])
+            if distance < 50 and distance > 1: # threshold
+                tmp_second_bboxes.remove(second_bbox) # same bbox
+                break
+            
+    # now in tmp_first_bboxes we have only boxes to check with histograms.
+    for bbox in tmp_second_bboxes:
+        histogram_frame_curr = calculate_histogram_from_coordinates(os.path.join(images_path, first_image_name), bbox)
+        histogram_frame_next = calculate_histogram_from_coordinates(os.path.join(images_path, second_image_name), bbox)
+        
+        hist_distance = calculate_histogram_distance(histogram_frame_curr[0], histogram_frame_next[0])
+        
+        if hist_distance < 3:
+            img = draw_bounding_box(Image.open(os.path.join(images_path, first_image_name)), [bbox])
+            img.save(os.path.join(output_dir, first_image_name), "JPEG")
+            first_bboxes.append(bbox)
+    
+    write_new_bounding_box(os.path.join(txt_path, first_image_name.replace('.jpg', '.txt')), first_bboxes)
 
-def equal_bboxes_length(first_bboxes: List[float], second_bboxes: List[float], first_image_name: str, second_image_name: str):
+
+def equal_bboxes_length(first_bboxes: List[List[float]], second_bboxes: List[List[float]], first_image_name: str, second_image_name: str, images_path: str, output_dir: str, txt_path: str):
     for idx, bbox in enumerate(first_bboxes):
         first_centroid = calculate_centroids(bbox[0], bbox[2], bbox[1], bbox[3])
         second_centroid = calculate_centroids(second_bboxes[idx][0], second_bboxes[idx][2], second_bboxes[idx][1], second_bboxes[idx][3])
         
         distance = math.hypot(second_centroid[0] - first_centroid[0], second_centroid[1] - first_centroid[1])
         
-        if distance > 50:
+        if distance < 50 and distance > 1:
             # they are, probably, two different bounding boxes and we need to check better
-            pass
+            #print(distance, first_image_name, second_image_name)
+            histogram_frame_curr = calculate_histogram_from_coordinates(os.path.join(images_path, first_image_name), bbox)
+            histogram_frame_next = calculate_histogram_from_coordinates(os.path.join(images_path, second_image_name), bbox)
+            
+            hist_distance = calculate_histogram_distance(histogram_frame_curr[0], histogram_frame_next[0])
+            if hist_distance < 3:
+                img = draw_bounding_box(Image.open(os.path.join(images_path, second_image_name)), [bbox])
+                img.save(os.path.join(output_dir, second_image_name), "JPEG")
+                second_bboxes.append(bbox)
+    
+    write_new_bounding_box(os.path.join(txt_path, second_image_name.replace('.jpg', '.txt')), second_bboxes)
+                
+                
+def write_new_bounding_box(file_path: str, bboxes: List[List[float]]):
+    with open(file_path, mode='w') as f:
+        json.dump(bboxes, f)
+    
+    
