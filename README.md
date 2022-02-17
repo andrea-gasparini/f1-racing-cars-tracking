@@ -12,5 +12,5 @@ pip install -r requirements.txt
 
 ## Authors
 
-- [Andrea Gasparini](github.com/andrea-gasparini)
-- [Edoardo Di Paolo](github.com/aedoardo)
+- [Andrea Gasparini](https://github.com/andrea-gasparini)
+- [Edoardo Di Paolo](https://github.com/aedoardo)
